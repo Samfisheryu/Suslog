@@ -42,6 +42,7 @@ import com.example.suslog.domain.setup.SetupStateMachine
 import com.example.suslog.domain.setup.SetupValues
 import com.example.suslog.domain.setup.defaultSetup
 import com.example.suslog.domain.setup.initialSetupStateMachine
+import com.example.suslog.domain.setup.withAdjustedAxleMatchedClick
 import com.example.suslog.domain.setup.withAdjustedClick
 import com.example.suslog.domain.setup.defaultClick
 import com.example.suslog.domain.suspension.AdjusterSpec
@@ -86,6 +87,7 @@ fun SuslogApp() {
     var showAddConfig by remember { mutableStateOf(false) }
     var showAddDocument by remember { mutableStateOf(false) }
     var showCreateMenu by remember { mutableStateOf(false) }
+    var axleLockEnabled by rememberSaveable { mutableStateOf(true) }
     var showSetupDebugInfo by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(repository) {
@@ -133,6 +135,7 @@ fun SuslogApp() {
                     activeConfigIdByCar = activeConfigIdByCar,
                     selectedCarId = selectedCarId,
                     setupRecommendation = selectedCarId?.let { setupRecommendationByCar[it] },
+                    axleLockEnabled = axleLockEnabled,
                     showDebugInfo = showSetupDebugInfo,
                     showAddCar = showAddCar,
                     onShowAddCarChange = { showAddCar = it },
@@ -186,7 +189,11 @@ fun SuslogApp() {
                         val currentDraft = draftSetupByCar[car.id]
                             ?: currentMachine.currentState?.setup
                             ?: car.defaultSetup()
-                        val nextDraft = currentDraft.withAdjustedClick(corner, adjuster, delta)
+                        val nextDraft = if (axleLockEnabled) {
+                            currentDraft.withAdjustedAxleMatchedClick(corner, adjuster, delta)
+                        } else {
+                            currentDraft.withAdjustedClick(corner, adjuster, delta)
+                        }
 
                         draftSetupByCar = draftSetupByCar + (car.id to nextDraft)
                     },
@@ -245,6 +252,7 @@ fun SuslogApp() {
                             setupRecommendationByCar = setupRecommendationByCar - carId
                         }
                     },
+                    onAxleLockEnabledChange = { axleLockEnabled = it },
                     modifier = Modifier.padding(innerPadding)
                 )
 

@@ -76,3 +76,32 @@ fun SetupValues.withAdjustedClick(
             }
         }
     }
+
+fun SetupValues.withAdjustedAxleMatchedClick(
+    corner: Corner,
+    adjuster: AdjusterSpec,
+    delta: Int,
+): SetupValues {
+    val current = this[corner]?.get(adjuster.label) ?: adjuster.defaultClick()
+    val target = (current + delta).coerceIn(1, adjuster.maxClicks)
+    val axleCorners = corner.axleCorners()
+
+    return mapValues { (setupCorner, values) ->
+        if (setupCorner !in axleCorners) {
+            values
+        } else {
+            values.toMutableMap().apply {
+                this[adjuster.label] = target
+            }
+        }
+    }
+}
+
+private fun Corner.axleCorners(): Set<Corner> =
+    when (this) {
+        Corner.LEFT_FRONT,
+        Corner.RIGHT_FRONT -> setOf(Corner.LEFT_FRONT, Corner.RIGHT_FRONT)
+
+        Corner.LEFT_REAR,
+        Corner.RIGHT_REAR -> setOf(Corner.LEFT_REAR, Corner.RIGHT_REAR)
+    }

@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -73,6 +74,7 @@ fun SetupScreen(
     activeConfigIdByCar: Map<String, String?>,
     selectedCarId: String?,
     setupRecommendation: SetupRecommendation?,
+    axleLockEnabled: Boolean,
     showDebugInfo: Boolean,
     showAddCar: Boolean,
     onShowAddCarChange: (Boolean) -> Unit,
@@ -87,6 +89,7 @@ fun SetupScreen(
     onSaveSetup: (CarProfile, SetupValues) -> Unit,
     onSaveConfigFeedback: (CarProfile, SetupValues, SetupConfigFeedback) -> Unit,
     onClearRecommendation: () -> Unit,
+    onAxleLockEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val selectedCar = cars.firstOrNull { it.id == selectedCarId } ?: cars.firstOrNull()
@@ -136,6 +139,7 @@ fun SetupScreen(
             setupRecommendation = selectedCar?.let { car ->
                 setupRecommendation?.takeIf { it.carId == car.id }
             },
+            axleLockEnabled = axleLockEnabled,
             showDebugInfo = showDebugInfo,
             onSelectCar = onSelectCar,
             onUpdateCar = onUpdateCar,
@@ -163,6 +167,7 @@ fun SetupScreen(
                 selectedCar?.let { car -> onSaveConfigFeedback(car, setup, feedback) }
             },
             onClearRecommendation = onClearRecommendation,
+            onAxleLockEnabledChange = onAxleLockEnabledChange,
             modifier = modifier
         )
     }
@@ -179,6 +184,7 @@ private fun CurrentSetupScreen(
     selectedConfig: SetupConfig?,
     activeConfig: SetupConfig?,
     setupRecommendation: SetupRecommendation?,
+    axleLockEnabled: Boolean,
     showDebugInfo: Boolean,
     onSelectCar: (String) -> Unit,
     onUpdateCar: (CarProfile) -> Unit,
@@ -190,6 +196,7 @@ private fun CurrentSetupScreen(
     onSaveSetup: (SetupValues) -> Unit,
     onSaveConfigFeedback: (SetupValues, SetupConfigFeedback) -> Unit,
     onClearRecommendation: () -> Unit,
+    onAxleLockEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val controlsEnabled = selectedCar != null
@@ -285,6 +292,12 @@ private fun CurrentSetupScreen(
             },
             onSelectCar = onSelectCar,
             onUpdateCar = onUpdateCar
+        )
+
+        AxleLockToggle(
+            checked = axleLockEnabled,
+            enabled = controlsEnabled,
+            onCheckedChange = onAxleLockEnabledChange
         )
 
         if (shouldShowFeedbackWarning) {
@@ -425,6 +438,51 @@ private fun CurrentSetupScreen(
                 }
             }
         )
+        }
+    }
+}
+
+@Composable
+private fun AxleLockToggle(
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = "Axle L/R Lock",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (checked) "Matched" else "Independent",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled
+            )
         }
     }
 }
@@ -1205,6 +1263,7 @@ private fun CurrentSetupPreview() {
             selectedConfig = config,
             activeConfig = config,
             setupRecommendation = null,
+            axleLockEnabled = true,
             showDebugInfo = true,
             onSelectCar = {},
             onUpdateCar = {},
@@ -1215,7 +1274,8 @@ private fun CurrentSetupPreview() {
             onClearDraft = {},
             onSaveSetup = {},
             onSaveConfigFeedback = { _, _ -> },
-            onClearRecommendation = {}
+            onClearRecommendation = {},
+            onAxleLockEnabledChange = {}
         )
     }
 }

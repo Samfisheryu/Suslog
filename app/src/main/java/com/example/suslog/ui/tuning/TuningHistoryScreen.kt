@@ -61,6 +61,8 @@ import com.example.suslog.domain.tuning.Axle
 import com.example.suslog.domain.tuning.SetupScoreV1
 import com.example.suslog.domain.tuning.SetupChangeSummary
 import com.example.suslog.domain.tuning.SetupChangeType
+import com.example.suslog.domain.tuning.TuningRecommendation
+import com.example.suslog.domain.tuning.buildTuningRecommendation
 import com.example.suslog.domain.tuning.summarizeSetupChange
 import com.example.suslog.ui.common.balanceLabel
 import com.example.suslog.ui.common.bodyControlLabel
@@ -94,6 +96,11 @@ fun TuningHistoryScreen(
             currentState = state
         )
     }
+    val recommendation = buildTuningRecommendation(
+        car = car,
+        config = config,
+        selectedStateIndex = selectedStateIndex
+    )
     val bestLap = states.mapNotNull { it.lapTimeMillis }.minOrNull()
 
     Column(
@@ -154,6 +161,10 @@ fun TuningHistoryScreen(
             TuningCard(title = "Model Input") {
                 ModelInputSummary(summary = selectedChangeSummary)
             }
+        }
+
+        TuningCard(title = "Recommendation") {
+            RecommendationCard(recommendation = recommendation)
         }
 
         if (selectedState != null) {
@@ -557,6 +568,78 @@ private fun ModelInputSummary(
         if (!summary.includedInModel) {
             Text(
                 text = summary.exclusionReason(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecommendationCard(
+    recommendation: TuningRecommendation,
+    modifier: Modifier = Modifier,
+) {
+    val variable = recommendation.variable
+    val best = recommendation.bestObserved
+    val fit = recommendation.fit
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            TuningMetric(
+                label = "Variable",
+                value = variable?.let { "${it.axle.label()} ${it.adjusterLabel}" } ?: "-",
+                modifier = Modifier.weight(1f)
+            )
+            TuningMetric(
+                label = "Clean Points",
+                value = "${recommendation.distinctPointCount}/${recommendation.cleanPointCount}",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            TuningMetric(
+                label = "Best Observed",
+                value = best?.let {
+                    "${it.stateIndex.stateLabel()} ${it.score.roundToInt()}"
+                } ?: "-",
+                modifier = Modifier.weight(1f)
+            )
+            TuningMetric(
+                label = "Next Test",
+                value = recommendation.recommendedClick?.let { "$it clicks" } ?: "-",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Text(
+            text = recommendation.message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        if (variable != null && recommendation.recommendedClick != null) {
+            Text(
+                text = "Try ${variable.axle.label()} ${variable.adjusterLabel} at ${recommendation.recommendedClick} clicks. Keep all other settings unchanged.",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        if (fit != null) {
+            Text(
+                text = "Quadratic fit predicted score: ${fit.predictedScore.roundToInt()}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

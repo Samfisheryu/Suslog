@@ -49,9 +49,12 @@ import com.example.suslog.domain.suspension.Corner
 import com.example.suslog.domain.suspension.StiffSide
 import com.example.suslog.domain.suspension.SuspensionType
 import com.example.suslog.ui.common.BalanceSelector
+import com.example.suslog.ui.common.LabeledScaleSelector
 import com.example.suslog.ui.common.SetupCornerCard
 import com.example.suslog.ui.common.balanceLabel
+import com.example.suslog.ui.common.bodyControlLabel
 import com.example.suslog.ui.common.formatLapTime
+import com.example.suslog.ui.common.gripLabel
 import com.example.suslog.ui.common.parseLapTimeMillis
 import com.example.suslog.ui.theme.SuslogTheme
 import java.util.UUID
@@ -423,8 +426,17 @@ private fun ConfigEditor(
     var cornerEntryBalance by remember(car.id, initialConfig?.id) {
         mutableIntStateOf(initialConfig?.cornerEntryBalance ?: 0)
     }
+    var cornerMidBalance by remember(car.id, initialConfig?.id) {
+        mutableIntStateOf(initialConfig?.cornerMidBalance ?: 0)
+    }
     var cornerExitBalance by remember(car.id, initialConfig?.id) {
         mutableIntStateOf(initialConfig?.cornerExitBalance ?: 0)
+    }
+    var overallGrip by remember(car.id, initialConfig?.id) {
+        mutableIntStateOf(initialConfig?.overallGrip ?: 3)
+    }
+    var bodyControlBalance by remember(car.id, initialConfig?.id) {
+        mutableIntStateOf(initialConfig?.bodyControlBalance ?: 0)
     }
     var lapTimeText by remember(car.id, initialConfig?.id) {
         mutableStateOf(initialConfig?.lapTimeMillis?.formatLapTime().orEmpty())
@@ -545,9 +557,32 @@ private fun ConfigEditor(
                 onValueChange = { cornerEntryBalance = it ?: 0 }
             )
             BalanceSelector(
+                title = "Mid Corner",
+                value = cornerMidBalance,
+                onValueChange = { cornerMidBalance = it ?: 0 }
+            )
+            BalanceSelector(
                 title = "Corner Exit",
                 value = cornerExitBalance,
                 onValueChange = { cornerExitBalance = it ?: 0 }
+            )
+            LabeledScaleSelector(
+                title = "Overall Grip",
+                value = overallGrip,
+                options = (1..5).toList(),
+                labelForValue = ::gripLabel,
+                onValueChange = { overallGrip = it ?: 3 },
+                startLabel = "Low",
+                endLabel = "High"
+            )
+            LabeledScaleSelector(
+                title = "Body Control",
+                value = bodyControlBalance,
+                options = (-2..2).toList(),
+                labelForValue = ::bodyControlLabel,
+                onValueChange = { bodyControlBalance = it ?: 0 },
+                startLabel = "Too Stiff",
+                endLabel = "Too Much Roll"
             )
         }
 
@@ -599,7 +634,10 @@ private fun ConfigEditor(
                     val nextState = SetupConfigState(
                         setup = setup.alignedTo(car),
                         cornerEntryBalance = cornerEntryBalance,
+                        cornerMidBalance = cornerMidBalance,
                         cornerExitBalance = cornerExitBalance,
+                        overallGrip = overallGrip,
+                        bodyControlBalance = bodyControlBalance,
                         lapTimeMillis = parsedLapTime,
                         timestampMillis = now,
                         note = note.trim().ifEmpty { null }

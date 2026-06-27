@@ -98,7 +98,10 @@ fun SetupConfig.currentStateEntity(): SetupConfigStateEntity {
         id = state.id ?: 0,
         configId = id,
         cornerEntryBalance = state.cornerEntryBalance,
+        cornerMidBalance = state.cornerMidBalance,
         cornerExitBalance = state.cornerExitBalance,
+        overallGrip = state.overallGrip,
+        bodyControlBalance = state.bodyControlBalance,
         lapTimeMillis = state.lapTimeMillis,
         timestampMillis = state.timestampMillis,
         note = state.note
@@ -143,7 +146,10 @@ fun SetupConfigStateEntity.toDomain(
     return SetupConfigState(
         setup = setup,
         cornerEntryBalance = cornerEntryBalance,
+        cornerMidBalance = cornerMidBalance,
         cornerExitBalance = cornerExitBalance,
+        overallGrip = overallGrip,
+        bodyControlBalance = bodyControlBalance,
         lapTimeMillis = lapTimeMillis,
         timestampMillis = timestampMillis,
         note = note,
@@ -183,7 +189,10 @@ fun legacySetupConfigFromEntities(
             SetupConfigState(
                 setup = setup,
                 cornerEntryBalance = config.cornerEntryBalance,
+                cornerMidBalance = 0,
                 cornerExitBalance = config.cornerExitBalance,
+                overallGrip = 3,
+                bodyControlBalance = 0,
                 lapTimeMillis = config.lapTimeMillis,
                 timestampMillis = config.updatedAtMillis,
                 note = null

@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SetupConfigStateClickEntity::class,
         TuningDocumentEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class SuslogDatabase : RoomDatabase() {
@@ -35,7 +35,13 @@ abstract class SuslogDatabase : RoomDatabase() {
                     context.applicationContext,
                     SuslogDatabase::class.java,
                     "suslog.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                ).addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6
+                )
                     .build()
                     .also { instance = it }
             }
@@ -169,6 +175,20 @@ abstract class SuslogDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_tuning_documents_carId ON tuning_documents(carId)"
+                )
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE setup_config_states ADD COLUMN cornerMidBalance INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE setup_config_states ADD COLUMN overallGrip INTEGER NOT NULL DEFAULT 3"
+                )
+                db.execSQL(
+                    "ALTER TABLE setup_config_states ADD COLUMN bodyControlBalance INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }

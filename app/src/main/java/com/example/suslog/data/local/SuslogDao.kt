@@ -75,7 +75,10 @@ interface SuslogDao {
         """
         UPDATE setup_config_states
         SET cornerEntryBalance = :cornerEntryBalance,
+            cornerMidBalance = :cornerMidBalance,
             cornerExitBalance = :cornerExitBalance,
+            overallGrip = :overallGrip,
+            bodyControlBalance = :bodyControlBalance,
             lapTimeMillis = :lapTimeMillis,
             timestampMillis = :timestampMillis,
             note = :note
@@ -85,7 +88,10 @@ interface SuslogDao {
     suspend fun updateSetupConfigState(
         stateId: Long,
         cornerEntryBalance: Int,
+        cornerMidBalance: Int,
         cornerExitBalance: Int,
+        overallGrip: Int,
+        bodyControlBalance: Int,
         lapTimeMillis: Long?,
         timestampMillis: Long,
         note: String?,
@@ -194,7 +200,10 @@ interface SuslogDao {
             updateSetupConfigState(
                 stateId = existingStateId,
                 cornerEntryBalance = state.cornerEntryBalance,
+                cornerMidBalance = state.cornerMidBalance,
                 cornerExitBalance = state.cornerExitBalance,
+                overallGrip = state.overallGrip,
+                bodyControlBalance = state.bodyControlBalance,
                 lapTimeMillis = state.lapTimeMillis,
                 timestampMillis = state.timestampMillis,
                 note = state.note

@@ -10,6 +10,12 @@ Working meaning:
 - Score = derived value computed from labels for ranking and charting.
 - Recommendation = next test suggestion, not a final global optimum.
 
+Feedback policy:
+
+- One setup state keeps one final feedback record.
+- If the user edits feedback for the same setup, replace the existing feedback instead of appending another test result.
+- Earlier feedback drafts are not model input because Suslog treats the latest saved feedback as the user's final judgment.
+
 ## Phase 1: Stable Labels And Score
 
 Goal: collect enough clean driver feedback to make state history useful before adding fitting.
@@ -42,6 +48,14 @@ UI changes:
 
 - Config feedback panel records all labels.
 - Tuning history displays score per selected state.
+- Tuning history displays a five-axis subjective score star:
+  - Entry Balance
+  - Mid Balance
+  - Exit Balance
+  - Grip
+  - Body Control
+- The star normalizes each subjective label from bad at the center to good at the outside.
+- The computed score is displayed in the center of the star.
 - Tuning charts can show score trend before any curve fitting exists.
 
 ## Phase 2: Runtime Diff Validator

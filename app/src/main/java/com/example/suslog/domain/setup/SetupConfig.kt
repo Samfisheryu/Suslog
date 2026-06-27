@@ -16,8 +16,17 @@ data class SetupConfig(
     val cornerEntryBalance: Int
         get() = currentState?.cornerEntryBalance ?: 0
 
+    val cornerMidBalance: Int
+        get() = currentState?.cornerMidBalance ?: 0
+
     val cornerExitBalance: Int
         get() = currentState?.cornerExitBalance ?: 0
+
+    val overallGrip: Int
+        get() = currentState?.overallGrip ?: 3
+
+    val bodyControlBalance: Int
+        get() = currentState?.bodyControlBalance ?: 0
 
     val lapTimeMillis: Long?
         get() = currentState?.lapTimeMillis
@@ -42,7 +51,10 @@ data class SetupConfig(
         val nextState = SetupConfigState(
             setup = setup,
             cornerEntryBalance = requireNotNull(feedback.cornerEntryBalance),
+            cornerMidBalance = requireNotNull(feedback.cornerMidBalance),
             cornerExitBalance = requireNotNull(feedback.cornerExitBalance),
+            overallGrip = requireNotNull(feedback.overallGrip),
+            bodyControlBalance = requireNotNull(feedback.bodyControlBalance),
             lapTimeMillis = feedback.lapTimeMillis,
             timestampMillis = timestampMillis,
             note = feedback.note
@@ -66,7 +78,10 @@ data class SetupConfig(
 data class SetupConfigState(
     val setup: SetupValues,
     val cornerEntryBalance: Int,
+    val cornerMidBalance: Int = 0,
     val cornerExitBalance: Int,
+    val overallGrip: Int = 3,
+    val bodyControlBalance: Int = 0,
     val lapTimeMillis: Long?,
     val timestampMillis: Long,
     val note: String? = null,
@@ -75,7 +90,10 @@ data class SetupConfigState(
 
 data class SetupConfigFeedback(
     val cornerEntryBalance: Int?,
+    val cornerMidBalance: Int?,
     val cornerExitBalance: Int?,
+    val overallGrip: Int?,
+    val bodyControlBalance: Int?,
     val lapTimeMillis: Long?,
     val note: String?,
 )

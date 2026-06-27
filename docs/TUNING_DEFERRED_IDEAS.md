@@ -57,16 +57,15 @@ Possible inputs:
 
 ## Repeated Same-Setup Test Points
 
-Current behavior updates the latest config state when setup is unchanged. Repeated same-setup testing may be useful later for noise estimation.
+Do not add repeated same-setup test points under the current product principle.
 
-Possible future UI split:
+Current policy:
 
-- Update this test result
-- Record new test point
+- if setup is unchanged, saved feedback updates/replaces the existing state feedback
+- Suslog treats the latest saved feedback as the user's final judgment
+- earlier feedback drafts do not count as model data
 
-Reason deferred:
-
-- adds workflow complexity before labels and scoring are stable
+Only reconsider this if the product explicitly changes toward repeatability/noise analysis.
 
 ## Persisted Change Metadata
 

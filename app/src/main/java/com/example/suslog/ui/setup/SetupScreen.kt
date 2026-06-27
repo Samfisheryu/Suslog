@@ -53,8 +53,11 @@ import com.example.suslog.domain.suspension.StiffSide
 import com.example.suslog.domain.suspension.SuspensionType
 import com.example.suslog.ui.common.BalanceSelector
 import com.example.suslog.ui.common.ChoiceButton
+import com.example.suslog.ui.common.LabeledScaleSelector
 import com.example.suslog.ui.common.SetupCornerCard
+import com.example.suslog.ui.common.bodyControlLabel
 import com.example.suslog.ui.common.formatLapTime
+import com.example.suslog.ui.common.gripLabel
 import com.example.suslog.ui.common.parseLapTimeMillis
 import com.example.suslog.ui.theme.SuslogTheme
 import java.text.SimpleDateFormat
@@ -208,8 +211,17 @@ private fun CurrentSetupScreen(
     var cornerEntryBalance by remember(activeConfig?.id, setup) {
         mutableStateOf(if (currentSetupHasFeedback) activeConfig?.cornerEntryBalance else null)
     }
+    var cornerMidBalance by remember(activeConfig?.id, setup) {
+        mutableStateOf(if (currentSetupHasFeedback) activeConfig?.cornerMidBalance else null)
+    }
     var cornerExitBalance by remember(activeConfig?.id, setup) {
         mutableStateOf(if (currentSetupHasFeedback) activeConfig?.cornerExitBalance else null)
+    }
+    var overallGrip by remember(activeConfig?.id, setup) {
+        mutableStateOf(if (currentSetupHasFeedback) activeConfig?.overallGrip else null)
+    }
+    var bodyControlBalance by remember(activeConfig?.id, setup) {
+        mutableStateOf(if (currentSetupHasFeedback) activeConfig?.bodyControlBalance else null)
     }
     var lapTimeText by remember(activeConfig?.id, setup) {
         mutableStateOf(
@@ -226,14 +238,24 @@ private fun CurrentSetupScreen(
     val parsedLapTime = parseLapTimeMillis(lapTimeText)
     val lapTimeIsValid = lapTimeText.trim().isEmpty() || parsedLapTime != null
     val feedbackHasContent = cornerEntryBalance != null ||
+        cornerMidBalance != null ||
         cornerExitBalance != null ||
+        overallGrip != null ||
+        bodyControlBalance != null ||
         parsedLapTime != null ||
         note.trim().isNotEmpty()
-    val feedbackIsComplete = cornerEntryBalance != null && cornerExitBalance != null
+    val feedbackIsComplete = cornerEntryBalance != null &&
+        cornerMidBalance != null &&
+        cornerExitBalance != null &&
+        overallGrip != null &&
+        bodyControlBalance != null
     val feedback = if (activeConfig != null && lapTimeIsValid && feedbackIsComplete) {
         SetupConfigFeedback(
             cornerEntryBalance = cornerEntryBalance,
+            cornerMidBalance = cornerMidBalance,
             cornerExitBalance = cornerExitBalance,
+            overallGrip = overallGrip,
+            bodyControlBalance = bodyControlBalance,
             lapTimeMillis = parsedLapTime,
             note = note.trim().ifEmpty { null }
         )
@@ -243,7 +265,10 @@ private fun CurrentSetupScreen(
     val hasFeedbackChanges = activeConfig != null && feedback != null && (
         activeConfig.currentState?.setup != setup ||
             feedback.cornerEntryBalance != activeConfig.cornerEntryBalance ||
+            feedback.cornerMidBalance != activeConfig.cornerMidBalance ||
             feedback.cornerExitBalance != activeConfig.cornerExitBalance ||
+            feedback.overallGrip != activeConfig.overallGrip ||
+            feedback.bodyControlBalance != activeConfig.bodyControlBalance ||
             feedback.lapTimeMillis != activeConfig.lapTimeMillis ||
             feedback.note != activeConfig.currentState?.note
         )
@@ -423,13 +448,19 @@ private fun CurrentSetupScreen(
         ConfigFeedbackPanel(
             activeConfig = activeConfig,
             cornerEntryBalance = cornerEntryBalance,
+            cornerMidBalance = cornerMidBalance,
             cornerExitBalance = cornerExitBalance,
+            overallGrip = overallGrip,
+            bodyControlBalance = bodyControlBalance,
             lapTimeText = lapTimeText,
             note = note,
             lapTimeIsValid = lapTimeIsValid,
             canSaveFeedback = canSaveFeedback,
             onCornerEntryBalanceChange = { cornerEntryBalance = it },
+            onCornerMidBalanceChange = { cornerMidBalance = it },
             onCornerExitBalanceChange = { cornerExitBalance = it },
+            onOverallGripChange = { overallGrip = it },
+            onBodyControlBalanceChange = { bodyControlBalance = it },
             onLapTimeTextChange = { lapTimeText = it },
             onNoteChange = { note = it },
             onSaveFeedback = {
@@ -607,13 +638,19 @@ private fun SetupRecommendationBar(
 private fun ConfigFeedbackPanel(
     activeConfig: SetupConfig?,
     cornerEntryBalance: Int?,
+    cornerMidBalance: Int?,
     cornerExitBalance: Int?,
+    overallGrip: Int?,
+    bodyControlBalance: Int?,
     lapTimeText: String,
     note: String,
     lapTimeIsValid: Boolean,
     canSaveFeedback: Boolean,
     onCornerEntryBalanceChange: (Int?) -> Unit,
+    onCornerMidBalanceChange: (Int?) -> Unit,
     onCornerExitBalanceChange: (Int?) -> Unit,
+    onOverallGripChange: (Int?) -> Unit,
+    onBodyControlBalanceChange: (Int?) -> Unit,
     onLapTimeTextChange: (String) -> Unit,
     onNoteChange: (String) -> Unit,
     onSaveFeedback: () -> Unit,
@@ -657,10 +694,36 @@ private fun ConfigFeedbackPanel(
                 enabled = enabled
             )
             BalanceSelector(
+                title = "Mid Corner",
+                value = cornerMidBalance,
+                onValueChange = onCornerMidBalanceChange,
+                enabled = enabled
+            )
+            BalanceSelector(
                 title = "Corner Exit",
                 value = cornerExitBalance,
                 onValueChange = onCornerExitBalanceChange,
                 enabled = enabled
+            )
+            LabeledScaleSelector(
+                title = "Overall Grip",
+                value = overallGrip,
+                options = (1..5).toList(),
+                labelForValue = ::gripLabel,
+                onValueChange = onOverallGripChange,
+                enabled = enabled,
+                startLabel = "Low",
+                endLabel = "High"
+            )
+            LabeledScaleSelector(
+                title = "Body Control",
+                value = bodyControlBalance,
+                options = (-2..2).toList(),
+                labelForValue = ::bodyControlLabel,
+                onValueChange = onBodyControlBalanceChange,
+                enabled = enabled,
+                startLabel = "Too Stiff",
+                endLabel = "Too Much Roll"
             )
 
             OutlinedTextField(

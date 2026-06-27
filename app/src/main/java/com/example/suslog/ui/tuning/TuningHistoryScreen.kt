@@ -57,7 +57,11 @@ import com.example.suslog.domain.suspension.AdjusterSpec
 import com.example.suslog.domain.suspension.Corner
 import com.example.suslog.domain.suspension.StiffSide
 import com.example.suslog.domain.suspension.SuspensionType
+import com.example.suslog.domain.tuning.Axle
 import com.example.suslog.domain.tuning.SetupScoreV1
+import com.example.suslog.domain.tuning.SetupChangeSummary
+import com.example.suslog.domain.tuning.SetupChangeType
+import com.example.suslog.domain.tuning.summarizeSetupChange
 import com.example.suslog.ui.common.balanceLabel
 import com.example.suslog.ui.common.bodyControlLabel
 import com.example.suslog.ui.common.formatLapTime
@@ -84,6 +88,12 @@ fun TuningHistoryScreen(
     }
     val selectedStateIndex = requestedStateIndex.coerceIn(0, states.lastIndex.coerceAtLeast(0))
     val selectedState = states.getOrNull(selectedStateIndex)
+    val selectedChangeSummary = selectedState?.let { state ->
+        summarizeSetupChange(
+            previousState = states.getOrNull(selectedStateIndex - 1),
+            currentState = state
+        )
+    }
     val bestLap = states.mapNotNull { it.lapTimeMillis }.minOrNull()
 
     Column(
@@ -137,6 +147,12 @@ fun TuningHistoryScreen(
                     stateLabel = selectedStateIndex.stateLabel(),
                     onApply = { onApplyState(selectedStateIndex, selectedState) }
                 )
+            }
+        }
+
+        if (selectedChangeSummary != null) {
+            TuningCard(title = "Model Input") {
+                ModelInputSummary(summary = selectedChangeSummary)
             }
         }
 
@@ -515,6 +531,40 @@ private fun CornerSetupBlock(
 }
 
 @Composable
+private fun ModelInputSummary(
+    summary: SetupChangeSummary,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            TuningMetric(
+                label = "Change",
+                value = summary.changeLabel(),
+                modifier = Modifier.weight(1f)
+            )
+            TuningMetric(
+                label = "Included",
+                value = if (summary.includedInModel) "Yes" else "No",
+                modifier = Modifier.weight(1f)
+            )
+        }
+        if (!summary.includedInModel) {
+            Text(
+                text = summary.exclusionReason(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 private fun SubjectiveScoreStar(
     state: SetupConfigState,
     modifier: Modifier = Modifier,
@@ -713,6 +763,46 @@ private data class StarTooltip(
     val text: String,
     val offset: IntOffset,
 )
+
+private fun SetupChangeSummary.changeLabel(): String =
+    when (type) {
+        SetupChangeType.BASELINE -> "Baseline"
+        SetupChangeType.AXLE_SINGLE_ADJUSTER -> listOfNotNull(
+            axle?.label(),
+            adjusterLabel,
+            deltaClicks?.signedClicks()
+        ).joinToString(" ")
+
+        SetupChangeType.SINGLE_CORNER -> listOfNotNull(
+            diffs.firstOrNull()?.corner?.shortLabel(),
+            adjusterLabel,
+            deltaClicks?.signedClicks()
+        ).joinToString(" ")
+
+        SetupChangeType.MIXED -> "Mixed changes"
+        SetupChangeType.UNKNOWN -> "Unknown"
+    }
+
+private fun SetupChangeSummary.exclusionReason(): String =
+    when (type) {
+        SetupChangeType.BASELINE -> "Baseline states stay in history but are not a model input."
+        SetupChangeType.AXLE_SINGLE_ADJUSTER -> ""
+        SetupChangeType.SINGLE_CORNER -> "Single-corner changes stay in history but are excluded from axle tuning."
+        SetupChangeType.MIXED -> "Multiple variables changed, so this state is excluded from model input."
+        SetupChangeType.UNKNOWN -> "This change could not be classified reliably."
+    }
+
+private fun Axle.label(): String =
+    when (this) {
+        Axle.FRONT -> "Front"
+        Axle.REAR -> "Rear"
+    }
+
+private fun Int.signedClicks(): String =
+    when {
+        this > 0 -> "+$this"
+        else -> toString()
+    }
 
 @Composable
 private fun LapTimeTrendChart(

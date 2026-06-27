@@ -51,6 +51,9 @@ import com.example.suslog.domain.suspension.AdjusterSpec
 import com.example.suslog.domain.suspension.Corner
 import com.example.suslog.domain.suspension.StiffSide
 import com.example.suslog.domain.suspension.SuspensionType
+import com.example.suslog.domain.tuning.Axle
+import com.example.suslog.domain.tuning.AxleSideMismatch
+import com.example.suslog.domain.tuning.findAxleSideMismatches
 import com.example.suslog.ui.common.BalanceSelector
 import com.example.suslog.ui.common.ChoiceButton
 import com.example.suslog.ui.common.LabeledScaleSelector
@@ -281,6 +284,9 @@ private fun CurrentSetupScreen(
     val branchConfig = activeConfig ?: selectedConfig
     val targetSetup = setupRecommendation?.setup ?: branchConfig?.setup
     val recommendationLabel = setupRecommendation?.stateLabel?.let { "Recommend $it" } ?: "Recommend"
+    val axleSideMismatches = selectedCar?.let { car ->
+        findAxleSideMismatches(car = car, setup = setup)
+    }.orEmpty()
 
     fun showWarningAndScrollToFeedback() {
         scope.launch {
@@ -324,6 +330,10 @@ private fun CurrentSetupScreen(
             enabled = controlsEnabled,
             onCheckedChange = onAxleLockEnabledChange
         )
+
+        if (axleSideMismatches.isNotEmpty()) {
+            AxleSideMismatchWarningBar(mismatches = axleSideMismatches)
+        }
 
         if (shouldShowFeedbackWarning) {
             ConfigFeedbackWarningBar(
@@ -472,6 +482,44 @@ private fun CurrentSetupScreen(
         }
     }
 }
+
+@Composable
+private fun AxleSideMismatchWarningBar(
+    mismatches: List<AxleSideMismatch>,
+    modifier: Modifier = Modifier,
+) {
+    val first = mismatches.first()
+    val mismatchCount = mismatches.size
+    val detail = "${first.axle.label()} ${first.adjusterLabel}: L ${first.leftValue} / R ${first.rightValue}"
+    val message = if (mismatchCount == 1) {
+        "Left/right values differ. $detail"
+    } else {
+        "Left/right values differ in $mismatchCount places. $detail"
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        tonalElevation = 3.dp
+    ) {
+        Text(
+            text = message,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+private fun Axle.label(): String =
+    when (this) {
+        Axle.FRONT -> "Front"
+        Axle.REAR -> "Rear"
+    }
 
 @Composable
 private fun AxleLockToggle(

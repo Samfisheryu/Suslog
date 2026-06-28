@@ -36,10 +36,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.suslog.domain.car.CarProfile
+import com.example.suslog.ui.common.FitText
 import com.example.suslog.domain.setup.SetupConfig
 import com.example.suslog.domain.setup.SetupConfigFeedback
 import com.example.suslog.domain.setup.SetupConfigState
@@ -508,9 +508,7 @@ private fun AxleSideMismatchWarningBar(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onTertiaryContainer,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
@@ -542,19 +540,17 @@ private fun AxleLockToggle(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Text(
+                FitText(
                     text = "Axle L/R Lock",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Text(
+                FitText(
                     text = if (checked) "Matched" else "Independent",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
             Switch(
@@ -666,14 +662,12 @@ private fun SetupRecommendationBar(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
+            FitText(
                 text = "Recommended: ${recommendation.configName} / ${recommendation.stateLabel}",
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                fontWeight = FontWeight.SemiBold
             )
             TextButton(onClick = onClear) {
                 Text("Clear")
@@ -726,12 +720,14 @@ private fun ConfigFeedbackPanel(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
-                Text(
+                FitText(
                     text = activeConfig?.name ?: "Current",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    textAlign = TextAlign.End,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 8.dp)
                 )
             }
 
@@ -870,11 +866,9 @@ private fun SetupTopBar(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                Text(
+                FitText(
                     text = activeConfig?.name ?: selectedConfig?.name ?: "Current",
                     modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Start
                 )
                 Text("v")
@@ -921,10 +915,8 @@ private fun SetupTopBar(
             },
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
         ) {
-            Text(
+            FitText(
                 text = selectedCar?.name ?: "No Car",
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 92.dp)
             )
         }

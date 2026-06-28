@@ -2,10 +2,8 @@ package com.example.suslog.ui.common
 
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 
 @Composable
 fun ChoiceButton(
@@ -19,22 +17,14 @@ fun ChoiceButton(
             onClick = onClick,
             modifier = modifier
         ) {
-            Text(
-                text = label,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            FitText(text = label)
         }
     } else {
         OutlinedButton(
             onClick = onClick,
             modifier = modifier
         ) {
-            Text(
-                text = label,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            FitText(text = label)
         }
     }
 }

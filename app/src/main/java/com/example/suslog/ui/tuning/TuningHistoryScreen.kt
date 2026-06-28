@@ -1,21 +1,22 @@
 package com.example.suslog.ui.tuning
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,8 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,15 +36,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.suslog.domain.car.CarProfile
 import com.example.suslog.domain.setup.SetupConfig
@@ -64,10 +63,8 @@ import com.example.suslog.domain.tuning.SetupChangeType
 import com.example.suslog.domain.tuning.TuningRecommendation
 import com.example.suslog.domain.tuning.buildTuningRecommendation
 import com.example.suslog.domain.tuning.summarizeSetupChange
-import com.example.suslog.ui.common.balanceLabel
-import com.example.suslog.ui.common.bodyControlLabel
+import com.example.suslog.ui.common.FitText
 import com.example.suslog.ui.common.formatLapTime
-import com.example.suslog.ui.common.gripLabel
 import com.example.suslog.ui.theme.SuslogTheme
 import kotlin.math.PI
 import kotlin.math.cos
@@ -90,9 +87,10 @@ fun TuningHistoryScreen(
     }
     val selectedStateIndex = requestedStateIndex.coerceIn(0, states.lastIndex.coerceAtLeast(0))
     val selectedState = states.getOrNull(selectedStateIndex)
+    val previousState = states.getOrNull(selectedStateIndex - 1)
     val selectedChangeSummary = selectedState?.let { state ->
         summarizeSetupChange(
-            previousState = states.getOrNull(selectedStateIndex - 1),
+            previousState = previousState,
             currentState = state
         )
     }
@@ -117,28 +115,7 @@ fun TuningHistoryScreen(
             onBack = onBack
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-//            TuningMetric(
-//                label = "States",
-//                value = states.size.toString(),
-//                modifier = Modifier.weight(1f)
-//            )
-            TuningMetric(
-                label = "Best Lap",
-                value = bestLap?.formatLapTime() ?: "-",
-                modifier = Modifier.weight(1f)
-            )
-//            TuningMetric(
-//                label = "Selected",
-//                value = selectedStateIndex.stateLabel(),
-//                modifier = Modifier.weight(1f)
-//            )
-        }
-
-        TuningCard(title = "State Timeline") {
+        TuningCard(title = "Tuning History", meta = "${states.size} STATES") {
             StateTimeline(
                 stateCount = states.size,
                 selectedStateIndex = selectedStateIndex,
@@ -146,34 +123,34 @@ fun TuningHistoryScreen(
             )
         }
 
+        StateSummaryStrip(
+            stateText = "${selectedStateIndex + 1}/${states.size.coerceAtLeast(1)}",
+            bestLapText = bestLap?.formatLapTime() ?: "—",
+            changeSummary = selectedChangeSummary
+        )
+
         if (selectedState != null) {
+            TuningCard(
+                title = "State ${selectedStateIndex + 1} · Analysis",
+                meta = "SUBJECTIVE · V1"
+            ) {
+                AnalysisModule(
+                    state = selectedState,
+                    previousState = previousState,
+                    recommendation = recommendation
+                )
+            }
+
             TuningCard(title = "Selected State Setup") {
                 SelectedStateSetup(
                     car = car,
                     state = selectedState,
-                    stateLabel = selectedStateIndex.stateLabel(),
                     onApply = { onApplyState(selectedStateIndex, selectedState) }
                 )
             }
         }
 
-        if (selectedChangeSummary != null) {
-            TuningCard(title = "Model Input") {
-                ModelInputSummary(summary = selectedChangeSummary)
-            }
-        }
-
-        TuningCard(title = "Recommendation") {
-            RecommendationCard(recommendation = recommendation)
-        }
-
-        if (selectedState != null) {
-            TuningCard(title = "Subjective Score Star") {
-                SubjectiveScoreStar(state = selectedState)
-            }
-        }
-
-        TuningCard(title = "Balance Trend") {
+        TuningCard(title = "Balance Trend", meta = "NEUTRAL = 0") {
             TrendHeader(
                 left = "Entry / Mid / Exit",
                 right = "Neutral target"
@@ -191,7 +168,7 @@ fun TuningHistoryScreen(
             }
         }
 
-        TuningCard(title = "Lap Time Trend") {
+        TuningCard(title = "Lap Time Trend", meta = "LOWER = FASTER") {
             TrendHeader(
                 left = "Lower is faster",
                 right = bestLap?.let { "Best ${it.formatLapTime()}" } ?: "No lap data"
@@ -224,19 +201,17 @@ private fun TuningHistoryHeader(
             Text("Back")
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(
+            FitText(
                 text = config.name,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                modifier = Modifier.fillMaxWidth()
             )
-            Text(
+            FitText(
                 text = car.name,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                modifier = Modifier.fillMaxWidth()
             )
         }
         if (isActiveConfig) {
@@ -245,9 +220,12 @@ private fun TuningHistoryHeader(
     }
 }
 
+// ───────────────────────── shared telemetry chrome ─────────────────────────
+
 @Composable
 private fun TuningCard(
     title: String,
+    meta: String? = null,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -255,53 +233,88 @@ private fun TuningCard(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
+            SectionHeader(title = title, meta = meta)
             content()
         }
     }
 }
 
 @Composable
-private fun TuningMetric(
-    label: String,
-    value: String,
+private fun SectionHeader(
+    title: String,
+    meta: String?,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
+        Box(
+            modifier = Modifier
+                .size(width = 3.dp, height = 13.dp)
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(1.dp))
+        )
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        DashedRule(modifier = Modifier.weight(1f))
+        meta?.let {
             Text(
-                text = label,
+                text = it,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun DashedRule(modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.outline
+    Canvas(modifier = modifier.height(1.dp)) {
+        drawLine(
+            color = color,
+            start = Offset(0f, size.height / 2f),
+            end = Offset(size.width, size.height / 2f),
+            strokeWidth = size.height,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 6f))
+        )
+    }
+}
+
+@Composable
+private fun StatusPill(
+    text: String,
+    good: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val accent = if (good) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+    val fill = if (good) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+    } else {
+        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
+    }
+    Box(
+        modifier = modifier
+            .background(fill, RoundedCornerShape(5.dp))
+            .border(1.dp, accent.copy(alpha = 0.55f), RoundedCornerShape(5.dp))
+            .padding(horizontal = 7.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = text.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = accent
+        )
     }
 }
 
@@ -309,18 +322,420 @@ private fun TuningMetric(
 private fun ActiveConfigBadge(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(99.dp),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        shape = RoundedCornerShape(5.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
     ) {
         Text(
-            text = "Active",
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.labelMedium,
+            text = "● Active".uppercase(),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.Bold
         )
     }
 }
+
+// ───────────────────────── selected-state summary strip ─────────────────────────
+
+@Composable
+private fun StateSummaryStrip(
+    stateText: String,
+    bestLapText: String,
+    changeSummary: SetupChangeSummary?,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StripCell(label = "State", value = stateText, modifier = Modifier.weight(0.85f))
+            StripDivider()
+            StripCell(label = "Best Lap", value = bestLapText, modifier = Modifier.weight(1.1f))
+            StripDivider()
+            StripInputCell(
+                changeSummary = changeSummary,
+                modifier = Modifier.weight(1.7f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun StripCell(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        FitText(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun StripInputCell(
+    changeSummary: SetupChangeSummary?,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
+        Text(
+            text = "Input".uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            modifier = Modifier.padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            FitText(
+                text = changeSummary?.changeLabel() ?: "—",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            if (changeSummary?.includedInModel == true) {
+                StatusPill(text = "Incl", good = true)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StripDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(34.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
+}
+
+// ───────────────────────── consolidated analysis module ─────────────────────────
+
+@Composable
+private fun AnalysisModule(
+    state: SetupConfigState,
+    previousState: SetupConfigState?,
+    recommendation: TuningRecommendation,
+    modifier: Modifier = Modifier,
+) {
+    val score = SetupScoreV1.compute(state)
+    val primary = MaterialTheme.colorScheme.primary
+    val warn = MaterialTheme.colorScheme.tertiary
+    val bad = MaterialTheme.colorScheme.error
+
+    fun markColor(sub: Double): Color = when {
+        sub >= 0.75 -> primary
+        sub >= 0.40 -> warn
+        else -> bad
+    }
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ScoreRadar(
+                state = state,
+                previousState = previousState,
+                modifier = Modifier.size(150.dp)
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                AxisTickRow("Entry", balanceFraction(state.cornerEntryBalance), signedBalance(state.cornerEntryBalance), markColor(score.entry))
+                AxisTickRow("Mid", balanceFraction(state.cornerMidBalance), signedBalance(state.cornerMidBalance), markColor(score.mid))
+                AxisTickRow("Exit", balanceFraction(state.cornerExitBalance), signedBalance(state.cornerExitBalance), markColor(score.exit))
+                AxisTickRow("Grip", gripFraction(state.overallGrip), state.overallGrip.coerceIn(1, 5).toString(), markColor(score.grip))
+                AxisTickRow("Body", balanceFraction(state.bodyControlBalance), signedBalance(state.bodyControlBalance), markColor(score.bodyControl))
+            }
+        }
+
+        DashedRule(modifier = Modifier.fillMaxWidth())
+
+        RecommendationRow(recommendation = recommendation)
+    }
+}
+
+@Composable
+private fun AxisTickRow(
+    label: String,
+    fraction: Float,
+    valueText: String,
+    markColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val track = MaterialTheme.colorScheme.outline
+    val mid = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(38.dp)
+        )
+        Canvas(
+            modifier = Modifier
+                .weight(1f)
+                .height(18.dp)
+        ) {
+            val cy = size.height / 2f
+            drawLine(
+                color = track,
+                start = Offset(0f, cy),
+                end = Offset(size.width, cy),
+                strokeWidth = 2.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+            listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { f ->
+                val x = (f * size.width).coerceIn(0.5f, size.width - 0.5f)
+                val half = if (f == 0.5f) 6.dp.toPx() else 4.dp.toPx()
+                drawLine(
+                    color = if (f == 0.5f) mid else track,
+                    start = Offset(x, cy - half),
+                    end = Offset(x, cy + half),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+            val mx = (fraction * size.width).coerceIn(2.dp.toPx(), size.width - 2.dp.toPx())
+            drawLine(
+                color = markColor,
+                start = Offset(mx, cy - 7.dp.toPx()),
+                end = Offset(mx, cy + 7.dp.toPx()),
+                strokeWidth = 4.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+        }
+        Text(
+            text = valueText,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = markColor,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(28.dp)
+        )
+    }
+}
+
+@Composable
+private fun RecommendationRow(
+    recommendation: TuningRecommendation,
+    modifier: Modifier = Modifier,
+) {
+    val variable = recommendation.variable
+    val recClick = recommendation.recommendedClick
+    val hasTarget = variable != null && recClick != null
+    val targetText = if (hasTarget) {
+        val from = recommendation.bestObserved?.clickValue
+        val name = "${variable!!.axle.label()} ${variable.adjusterLabel}"
+        if (from != null && from != recClick) "$name  $from → $recClick" else "$name → $recClick"
+    } else {
+        "No clean target yet"
+    }
+    val confGood = recommendation.fit?.hasPeakInTestedRange == true
+    val confText = when {
+        variable == null -> "No Data"
+        confGood -> "Conf · Med"
+        else -> "Conf · Low"
+    }
+    val note = buildString {
+        append(recommendation.message)
+        if (hasTarget) append(" Keep all other clicks unchanged.")
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(28.dp)
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
+            )
+            Text(
+                text = "REC",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            FitText(
+                text = targetText,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            StatusPill(text = confText, good = confGood)
+        }
+        Text(
+            text = note,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// ───────────────────────── score radar ─────────────────────────
+
+@Composable
+private fun ScoreRadar(
+    state: SetupConfigState,
+    previousState: SetupConfigState?,
+    modifier: Modifier = Modifier,
+) {
+    val score = SetupScoreV1.compute(state)
+    val total = score.total.roundToInt()
+    val delta = previousState?.let { total - SetupScoreV1.compute(it).total.roundToInt() }
+
+    val stroke = MaterialTheme.colorScheme.primary
+    val fill = MaterialTheme.colorScheme.primaryContainer
+    val grid = MaterialTheme.colorScheme.outlineVariant
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val values = listOf(score.entry, score.mid, score.exit, score.grip, score.bodyControl)
+    val labels = listOf("Entry", "Mid", "Exit", "Grip", "Body")
+
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val radius = min(size.width, size.height) * 0.34f
+
+            fun point(index: Int, scale: Double): Offset {
+                val angle = -PI / 2.0 + index * 2.0 * PI / 5.0
+                return Offset(
+                    x = center.x + (cos(angle) * radius * scale).toFloat(),
+                    y = center.y + (sin(angle) * radius * scale).toFloat()
+                )
+            }
+
+            fun pentagonPath(scale: Double): Path =
+                Path().apply {
+                    repeat(5) { index ->
+                        val p = point(index, scale)
+                        if (index == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+                    }
+                    close()
+                }
+
+            listOf(0.33, 0.66, 1.0).forEach { ring ->
+                drawPath(
+                    path = pentagonPath(ring),
+                    color = grid,
+                    style = Stroke(width = 1.dp.toPx())
+                )
+            }
+            repeat(5) { index ->
+                drawLine(
+                    color = grid,
+                    start = center,
+                    end = point(index, 1.0),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+
+            val valuePath = Path().apply {
+                values.forEachIndexed { index, value ->
+                    val p = point(index, value.coerceIn(0.0, 1.0))
+                    if (index == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+                }
+                close()
+            }
+            drawPath(path = valuePath, color = fill.copy(alpha = 0.30f))
+            drawPath(
+                path = valuePath,
+                color = stroke,
+                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+            )
+            values.forEachIndexed { index, value ->
+                drawCircle(
+                    color = stroke,
+                    radius = 3.dp.toPx(),
+                    center = point(index, value.coerceIn(0.0, 1.0))
+                )
+            }
+
+            val paint = android.graphics.Paint().apply {
+                isAntiAlias = true
+                color = labelColor.toArgb()
+                textAlign = android.graphics.Paint.Align.CENTER
+                textSize = 9.dp.toPx()
+            }
+            labels.forEachIndexed { index, label ->
+                val p = point(index, 1.26)
+                drawContext.canvas.nativeCanvas.drawText(label.uppercase(), p.x, p.y + 3.dp.toPx(), paint)
+            }
+        }
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = total.toString(),
+                style = MaterialTheme.typography.displayLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "SCORE / 100",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (delta != null) {
+                DeltaChip(delta = delta, modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeltaChip(
+    delta: Int,
+    modifier: Modifier = Modifier,
+) {
+    val up = delta >= 0
+    val accent = if (up) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    val sign = if (up) "+" else ""
+    val arrow = if (up) "▲" else "▼"
+    Box(
+        modifier = modifier
+            .background(accent.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
+            .border(1.dp, accent.copy(alpha = 0.55f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 9.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = "Δ $sign$delta $arrow",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = accent
+        )
+    }
+}
+
+// ───────────────────────── kept functional sections ─────────────────────────
 
 @Composable
 private fun TrendHeader(
@@ -357,7 +772,6 @@ private fun StateTimeline(
     val surface = MaterialTheme.colorScheme.surface
     val firstVisibleIndex = (stateCount - 10).coerceAtLeast(0)
     val visibleIndices = (firstVisibleIndex until stateCount).toList()
-    val visibleSelectedIndex = visibleIndices.indexOf(selectedStateIndex)
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -419,28 +833,6 @@ private fun StateTimeline(
                 }
             }
         }
-
-//        Row(
-//            modifier = Modifier.fillMaxWidth(),
-//            horizontalArrangement = Arrangement.SpaceBetween
-//        ) {
-//            Text(
-//                text = visibleIndices.firstOrNull()?.stateLabel().orEmpty(),
-//                style = MaterialTheme.typography.labelSmall,
-//                color = MaterialTheme.colorScheme.onSurfaceVariant
-//            )
-//            Text(
-//                text = if (visibleSelectedIndex >= 0) selectedStateIndex.stateLabel() else "",
-//                style = MaterialTheme.typography.labelSmall,
-//                color = MaterialTheme.colorScheme.primary,
-//                fontWeight = FontWeight.Bold
-//            )
-//            Text(
-//                text = visibleIndices.lastOrNull()?.stateLabel().orEmpty(),
-//                style = MaterialTheme.typography.labelSmall,
-//                color = MaterialTheme.colorScheme.onSurfaceVariant
-//            )
-//        }
     }
 }
 
@@ -448,7 +840,6 @@ private fun StateTimeline(
 private fun SelectedStateSetup(
     car: CarProfile,
     state: SetupConfigState,
-    stateLabel: String,
     onApply: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -516,7 +907,7 @@ private fun CornerSetupBlock(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
@@ -528,364 +919,17 @@ private fun CornerSetupBlock(
                 fontWeight = FontWeight.Bold
             )
             car.adjusters.forEach { adjuster ->
-                Text(
+                FitText(
                     text = "${adjuster.label}: ${
                         setup[corner]?.get(adjuster.label) ?: adjuster.defaultClick()
                     }",
                     style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
     }
 }
-
-@Composable
-private fun ModelInputSummary(
-    summary: SetupChangeSummary,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            TuningMetric(
-                label = "Change",
-                value = summary.changeLabel(),
-                modifier = Modifier.weight(1f)
-            )
-            TuningMetric(
-                label = "Included",
-                value = if (summary.includedInModel) "Yes" else "No",
-                modifier = Modifier.weight(1f)
-            )
-        }
-        if (!summary.includedInModel) {
-            Text(
-                text = summary.exclusionReason(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun RecommendationCard(
-    recommendation: TuningRecommendation,
-    modifier: Modifier = Modifier,
-) {
-    val variable = recommendation.variable
-    val best = recommendation.bestObserved
-    val fit = recommendation.fit
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            TuningMetric(
-                label = "Variable",
-                value = variable?.let { "${it.axle.label()} ${it.adjusterLabel}" } ?: "-",
-                modifier = Modifier.weight(1f)
-            )
-            TuningMetric(
-                label = "Clean Points",
-                value = "${recommendation.distinctPointCount}/${recommendation.cleanPointCount}",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            TuningMetric(
-                label = "Best Observed",
-                value = best?.let {
-                    "${it.stateIndex.stateLabel()} ${it.score.roundToInt()}"
-                } ?: "-",
-                modifier = Modifier.weight(1f)
-            )
-            TuningMetric(
-                label = "Next Test",
-                value = recommendation.recommendedClick?.let { "$it clicks" } ?: "-",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Text(
-            text = recommendation.message,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        if (variable != null && recommendation.recommendedClick != null) {
-            Text(
-                text = "Try ${variable.axle.label()} ${variable.adjusterLabel} at ${recommendation.recommendedClick} clicks. Keep all other settings unchanged.",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        if (fit != null) {
-            Text(
-                text = "Quadratic fit predicted score: ${fit.predictedScore.roundToInt()}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun SubjectiveScoreStar(
-    state: SetupConfigState,
-    modifier: Modifier = Modifier,
-) {
-    val score = SetupScoreV1.compute(state)
-    var tooltip by remember(state) { mutableStateOf<StarTooltip?>(null) }
-    val primary = MaterialTheme.colorScheme.primary
-    val outline = MaterialTheme.colorScheme.outlineVariant
-    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val values = listOf(
-        score.entry,
-        score.mid,
-        score.exit,
-        score.grip,
-        score.bodyControl
-    )
-    val labels = listOf("Entry", "Mid", "Exit", "Grip", "Body")
-    val rawLabels = listOf(
-        "Entry: ${balanceLabel(state.cornerEntryBalance)}",
-        "Mid: ${balanceLabel(state.cornerMidBalance)}",
-        "Exit: ${balanceLabel(state.cornerExitBalance)}",
-        "Grip: ${gripLabel(state.overallGrip)}",
-        "Body: ${bodyControlLabel(state.bodyControlBalance)}"
-    )
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(260.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(state, values) {
-                    detectTapGestures { tap ->
-                        val center = Offset(size.width / 2f, size.height / 2f)
-                        val radius = min(size.width, size.height) * 0.34f
-
-                        fun point(index: Int, scale: Double): Offset {
-                            val angle = -PI / 2.0 + index * 2.0 * PI / 5.0
-                            return Offset(
-                                x = center.x + (cos(angle) * radius * scale).toFloat(),
-                                y = center.y + (sin(angle) * radius * scale).toFloat()
-                            )
-                        }
-
-                        val nearest = values.indices.minBy { index ->
-                            val p = point(index, values[index].coerceIn(0.0, 1.0))
-                            (tap - p).getDistance()
-                        }
-                        val nearestPoint = point(nearest, values[nearest].coerceIn(0.0, 1.0))
-                        val hitRadius = 28.dp.toPx()
-
-                        tooltip = if ((tap - nearestPoint).getDistance() <= hitRadius) {
-                            val tooltipWidth = 150.dp.toPx()
-                            val tooltipHeight = 42.dp.toPx()
-                            StarTooltip(
-                                text = rawLabels[nearest],
-                                offset = IntOffset(
-                                    x = (nearestPoint.x - tooltipWidth / 2f)
-                                        .coerceIn(0f, size.width - tooltipWidth)
-                                        .roundToInt(),
-                                    y = (nearestPoint.y - tooltipHeight - 8.dp.toPx())
-                                        .coerceIn(0f, size.height - tooltipHeight)
-                                        .roundToInt()
-                                )
-                            )
-                        } else {
-                            null
-                        }
-                    }
-                }
-        ) {
-            val center = Offset(size.width / 2f, size.height / 2f)
-            val radius = min(size.width, size.height) * 0.34f
-
-            fun point(index: Int, scale: Double): Offset {
-                val angle = -PI / 2.0 + index * 2.0 * PI / 5.0
-                return Offset(
-                    x = center.x + (cos(angle) * radius * scale).toFloat(),
-                    y = center.y + (sin(angle) * radius * scale).toFloat()
-                )
-            }
-
-            fun pentagonPath(scale: Double): Path =
-                Path().apply {
-                    repeat(5) { index ->
-                        val p = point(index, scale)
-                        if (index == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
-                    }
-                    close()
-                }
-
-            (1..4).forEach { ring ->
-                drawPath(
-                    path = pentagonPath(ring / 4.0),
-                    color = outline.copy(alpha = 0.55f),
-                    style = Stroke(width = 1.dp.toPx())
-                )
-            }
-
-            repeat(5) { index ->
-                drawLine(
-                    color = outline.copy(alpha = 0.65f),
-                    start = center,
-                    end = point(index, 1.0),
-                    strokeWidth = 1.dp.toPx()
-                )
-            }
-
-            val valuePath = Path().apply {
-                values.forEachIndexed { index, value ->
-                    val p = point(index, value.coerceIn(0.0, 1.0))
-                    if (index == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
-                }
-                close()
-            }
-            drawPath(
-                path = valuePath,
-                color = primary.copy(alpha = 0.22f)
-            )
-            drawPath(
-                path = valuePath,
-                color = primary,
-                style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-            )
-
-            values.forEachIndexed { index, value ->
-                drawCircle(
-                    color = primary,
-                    radius = 4.dp.toPx(),
-                    center = point(index, value.coerceIn(0.0, 1.0))
-                )
-            }
-
-            val paint = android.graphics.Paint().apply {
-                isAntiAlias = true
-                color = labelColor.toArgb()
-                textAlign = android.graphics.Paint.Align.CENTER
-                textSize = 12.dp.toPx()
-            }
-            labels.forEachIndexed { index, label ->
-                val p = point(index, 1.18)
-                drawContext.canvas.nativeCanvas.drawText(label, p.x, p.y + 4.dp.toPx(), paint)
-            }
-        }
-
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            tonalElevation = 2.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = score.total.roundToInt().toString(),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "Score",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        tooltip?.let { shownTooltip ->
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .offset { shownTooltip.offset },
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f),
-                tonalElevation = 3.dp
-            ) {
-                Text(
-                    text = shownTooltip.text,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.surface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
-private data class StarTooltip(
-    val text: String,
-    val offset: IntOffset,
-)
-
-private fun SetupChangeSummary.changeLabel(): String =
-    when (type) {
-        SetupChangeType.BASELINE -> "Baseline"
-        SetupChangeType.AXLE_SINGLE_ADJUSTER -> listOfNotNull(
-            axle?.label(),
-            adjusterLabel,
-            deltaClicks?.signedClicks()
-        ).joinToString(" ")
-
-        SetupChangeType.SINGLE_CORNER -> listOfNotNull(
-            diffs.firstOrNull()?.corner?.shortLabel(),
-            adjusterLabel,
-            deltaClicks?.signedClicks()
-        ).joinToString(" ")
-
-        SetupChangeType.MIXED -> "Mixed changes"
-        SetupChangeType.UNKNOWN -> "Unknown"
-    }
-
-private fun SetupChangeSummary.exclusionReason(): String =
-    when (type) {
-        SetupChangeType.BASELINE -> "Baseline states stay in history but are not a model input."
-        SetupChangeType.AXLE_SINGLE_ADJUSTER -> ""
-        SetupChangeType.SINGLE_CORNER -> "Single-corner changes stay in history but are excluded from axle tuning."
-        SetupChangeType.MIXED -> "Multiple variables changed, so this state is excluded from model input."
-        SetupChangeType.UNKNOWN -> "This change could not be classified reliably."
-    }
-
-private fun Axle.label(): String =
-    when (this) {
-        Axle.FRONT -> "Front"
-        Axle.REAR -> "Rear"
-    }
-
-private fun Int.signedClicks(): String =
-    when {
-        this > 0 -> "+$this"
-        else -> toString()
-    }
 
 @Composable
 private fun LapTimeTrendChart(
@@ -970,10 +1014,10 @@ private fun BalanceTrendChart(
     selectedStateIndex: Int,
     modifier: Modifier = Modifier,
 ) {
-    val entryColor = Color(0xFF2D9CDB)
-    val midColor = Color(0xFF7C5CC4)
-    val exitColor = Color(0xFFE36A4A)
-    val neutralColor = Color(0xFF2F855A)
+    val entryColor = MaterialTheme.colorScheme.secondary
+    val midColor = Color(0xFF7A52D0)
+    val exitColor = Color(0xFFE0703A)
+    val neutralColor = Color(0xFF2F8559)
     val selectedColor = MaterialTheme.colorScheme.tertiary
     val grid = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
 
@@ -1031,36 +1075,22 @@ private fun BalanceTrendChart(
 
         states.getOrNull(selectedStateIndex)?.let { selectedState ->
             val x = xFor(selectedStateIndex)
-            drawCircle(
-                color = selectedColor.copy(alpha = 0.22f),
-                radius = 12.dp.toPx(),
-                center = Offset(x, yFor(selectedState.cornerEntryBalance))
-            )
-            drawCircle(
-                color = selectedColor,
-                radius = 5.dp.toPx(),
-                center = Offset(x, yFor(selectedState.cornerEntryBalance))
-            )
-            drawCircle(
-                color = selectedColor.copy(alpha = 0.22f),
-                radius = 12.dp.toPx(),
-                center = Offset(x, yFor(selectedState.cornerMidBalance))
-            )
-            drawCircle(
-                color = selectedColor,
-                radius = 5.dp.toPx(),
-                center = Offset(x, yFor(selectedState.cornerMidBalance))
-            )
-            drawCircle(
-                color = selectedColor.copy(alpha = 0.22f),
-                radius = 12.dp.toPx(),
-                center = Offset(x, yFor(selectedState.cornerExitBalance))
-            )
-            drawCircle(
-                color = selectedColor,
-                radius = 5.dp.toPx(),
-                center = Offset(x, yFor(selectedState.cornerExitBalance))
-            )
+            listOf(
+                selectedState.cornerEntryBalance,
+                selectedState.cornerMidBalance,
+                selectedState.cornerExitBalance
+            ).forEach { value ->
+                drawCircle(
+                    color = selectedColor.copy(alpha = 0.22f),
+                    radius = 12.dp.toPx(),
+                    center = Offset(x, yFor(value))
+                )
+                drawCircle(
+                    color = selectedColor,
+                    radius = 5.dp.toPx(),
+                    center = Offset(x, yFor(value))
+                )
+            }
         }
     }
 }
@@ -1071,11 +1101,11 @@ private fun BalanceLegend(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        LegendItem(label = "Entry", color = Color(0xFF2D9CDB))
-        LegendItem(label = "Mid", color = Color(0xFF7C5CC4))
-        LegendItem(label = "Exit", color = Color(0xFFE36A4A))
+        LegendItem(label = "Entry", color = MaterialTheme.colorScheme.secondary)
+        LegendItem(label = "Mid", color = Color(0xFF7A52D0))
+        LegendItem(label = "Exit", color = Color(0xFFE0703A))
         LegendItem(label = "Selected", color = MaterialTheme.colorScheme.tertiary)
-        LegendItem(label = "Neutral", color = Color(0xFF2F855A))
+        LegendItem(label = "Neutral", color = Color(0xFF2F8559))
     }
 }
 
@@ -1120,7 +1150,44 @@ private fun SelectedStateNote(
     }
 }
 
-private fun Int.stateLabel(): String = "S${this + 1}"
+// ───────────────────────── helpers ─────────────────────────
+
+private fun balanceFraction(value: Int): Float = (value.coerceIn(-2, 2) + 2) / 4f
+
+private fun gripFraction(value: Int): Float = (value.coerceIn(1, 5) - 1) / 4f
+
+private fun signedBalance(value: Int): String = if (value > 0) "+$value" else value.toString()
+
+private fun SetupChangeSummary.changeLabel(): String =
+    when (type) {
+        SetupChangeType.BASELINE -> "Baseline"
+        SetupChangeType.AXLE_SINGLE_ADJUSTER -> listOfNotNull(
+            axle?.label(),
+            adjusterLabel,
+            deltaClicks?.signedClicks()
+        ).joinToString(" ")
+
+        SetupChangeType.SINGLE_CORNER -> listOfNotNull(
+            diffs.firstOrNull()?.corner?.shortLabel(),
+            adjusterLabel,
+            deltaClicks?.signedClicks()
+        ).joinToString(" ")
+
+        SetupChangeType.MIXED -> "Mixed changes"
+        SetupChangeType.UNKNOWN -> "Unknown"
+    }
+
+private fun Axle.label(): String =
+    when (this) {
+        Axle.FRONT -> "Front"
+        Axle.REAR -> "Rear"
+    }
+
+private fun Int.signedClicks(): String =
+    when {
+        this > 0 -> "+$this"
+        else -> toString()
+    }
 
 private fun Corner.shortLabel(): String =
     when (this) {
@@ -1193,14 +1260,14 @@ private fun sampleHistoryConfig(car: CarProfile): SetupConfig {
             ),
             SetupConfigState(
                 setup = setup(0, 2),
-                cornerEntryBalance = 1,
+                cornerEntryBalance = 0,
                 cornerMidBalance = 1,
-                cornerExitBalance = 1,
-                overallGrip = 3,
+                cornerExitBalance = 0,
+                overallGrip = 4,
                 bodyControlBalance = -1,
                 lapTimeMillis = 93_780,
                 timestampMillis = 1_767_223_800_000,
-                note = "Went too stiff. Better response, but traction is worse."
+                note = "Went stiffer. Sharper response, traction a touch worse."
             ),
             SetupConfigState(
                 setup = setup(-1, 1),
@@ -1218,7 +1285,7 @@ private fun sampleHistoryConfig(car: CarProfile): SetupConfig {
     )
 }
 
-@Preview(showBackground = true, widthDp = 390, heightDp = 1100)
+@Preview(showBackground = true, widthDp = 390, heightDp = 1300)
 @Composable
 private fun TuningHistoryScreenPreview() {
     val car = sampleHistoryCar()

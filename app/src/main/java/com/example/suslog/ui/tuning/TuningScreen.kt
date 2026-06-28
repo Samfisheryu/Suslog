@@ -30,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.suslog.domain.car.CarProfile
@@ -41,6 +40,7 @@ import com.example.suslog.domain.suspension.AdjusterSpec
 import com.example.suslog.domain.suspension.StiffSide
 import com.example.suslog.domain.suspension.SuspensionType
 import com.example.suslog.domain.tuning.TuningDocument
+import com.example.suslog.ui.common.FitText
 import com.example.suslog.ui.theme.SuslogTheme
 import java.util.UUID
 
@@ -183,11 +183,9 @@ private fun TuningCarSelector(
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
         ) {
-            Text(
+            FitText(
                 text = selectedCar?.name ?: "No Car",
                 modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Start
             )
             Text("v")
@@ -226,11 +224,7 @@ private fun TuningSectionNavigator(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
                 ) {
-                    Text(
-                        text = section.label,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    FitText(text = section.label)
                 }
             } else {
                 OutlinedButton(
@@ -238,11 +232,7 @@ private fun TuningSectionNavigator(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
                 ) {
-                    Text(
-                        text = section.label,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    FitText(text = section.label)
                 }
             }
         }
@@ -364,13 +354,13 @@ private fun TuningNameRow(
         tonalElevation = 1.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Text(
+        FitText(
             text = name,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            fontWeight = FontWeight.SemiBold
         )
     }
 }

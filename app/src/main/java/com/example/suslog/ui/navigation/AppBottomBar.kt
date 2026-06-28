@@ -23,8 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.suslog.ui.common.FitText
 
 @Composable
 fun AppBottomBar(
@@ -132,17 +133,16 @@ private fun BottomBarTab(
         onClick = { onClick(destination) },
         modifier = modifier
     ) {
-        Text(
+        FitText(
             text = destination.label,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             color = if (selected) {
                 MaterialTheme.colorScheme.primary
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            style = MaterialTheme.typography.labelLarge
+            style = MaterialTheme.typography.labelLarge,
+            minFontSize = 8.sp
         )
     }
 }

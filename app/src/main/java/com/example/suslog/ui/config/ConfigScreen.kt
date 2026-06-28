@@ -34,10 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.suslog.domain.car.CarProfile
+import com.example.suslog.ui.common.FitText
 import com.example.suslog.domain.setup.SetupConfig
 import com.example.suslog.domain.setup.SetupConfigState
 import com.example.suslog.domain.setup.SetupValues
@@ -159,11 +159,9 @@ private fun ConfigTopNavigator(
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
         ) {
-            Text(
+            FitText(
                 text = selectedCar?.name ?: "Car",
                 modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Start
             )
             Text("v")
@@ -265,12 +263,11 @@ private fun SetupConfigSummaryCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
+                    FitText(
                         text = config.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Text(
                         text = config.lapTimeMillis?.formatLapTime() ?: "No lap time",
@@ -316,14 +313,12 @@ private fun BalanceSummary(
     value: Int,
     modifier: Modifier = Modifier,
 ) {
-    Text(
+    FitText(
         text = "$title: ${balanceLabel(value)}",
         modifier = modifier,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurface,
-        fontWeight = FontWeight.SemiBold,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
+        fontWeight = FontWeight.SemiBold
     )
 }
 
@@ -397,11 +392,10 @@ private fun CornerSetupSummary(
             fontWeight = FontWeight.SemiBold
         )
         car.adjusters.forEach { adjuster ->
-            Text(
+            FitText(
                 text = "${adjuster.label}: ${values[adjuster.label] ?: adjuster.defaultClick()}",
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

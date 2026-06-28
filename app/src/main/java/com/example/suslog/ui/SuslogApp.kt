@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,10 +49,13 @@ import com.example.suslog.domain.setup.defaultClick
 import com.example.suslog.domain.suspension.AdjusterSpec
 import com.example.suslog.domain.suspension.Corner
 import com.example.suslog.domain.tuning.TuningDocument
-import com.example.suslog.ui.common.PlaceholderScreen
+import com.example.suslog.settings.AppSettingsStore
+import com.example.suslog.settings.BiometricAuth
+import com.example.suslog.settings.BiometricAuthStatus
 import com.example.suslog.ui.config.ConfigScreen
 import com.example.suslog.ui.navigation.AppBottomBar
 import com.example.suslog.ui.navigation.AppDestination
+import com.example.suslog.ui.settings.SettingsScreen
 import com.example.suslog.ui.setup.SetupRecommendation
 import com.example.suslog.ui.setup.SetupScreen
 import com.example.suslog.ui.tuning.TuningScreen
@@ -60,14 +64,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun SuslogApp() {
+fun SuslogApp(
+    settingsStore: AppSettingsStore,
+    biometricAuth: BiometricAuth,
+) {
     val context = LocalContext.current
     val repository = remember {
         SetupRepository(SuslogDatabase.getInstance(context).suslogDao())
     }
     val scope = rememberCoroutineScope()
+    val biometricStatus = remember { biometricAuth.status() }
 
     var currentDestination by rememberSaveable { mutableStateOf(AppDestination.SETUP) }
+    var appLockEnabled by remember { mutableStateOf(settingsStore.isAppLockEnabled()) }
+    var appUnlocked by remember { mutableStateOf(!appLockEnabled) }
+    var accountMessage by remember { mutableStateOf<String?>(null) }
     var cars by remember { mutableStateOf<List<CarProfile>>(emptyList()) }
     var setupStateMachinesByCar by remember {
         mutableStateOf<Map<String, SetupStateMachine>>(emptyMap())
@@ -90,6 +101,44 @@ fun SuslogApp() {
     var axleLockEnabled by rememberSaveable { mutableStateOf(true) }
     var showSetupDebugInfo by rememberSaveable { mutableStateOf(false) }
 
+    fun requestUnlock(
+        title: String = "Unlock Suslog",
+        subtitle: String = "Use device security to continue.",
+        onSuccess: () -> Unit = {},
+    ) {
+        biometricAuth.authenticate(
+            title = title,
+            subtitle = subtitle,
+            onSuccess = {
+                appUnlocked = true
+                accountMessage = "Verification succeeded."
+                onSuccess()
+            },
+            onError = { error ->
+                accountMessage = error
+            }
+        )
+    }
+
+    fun requestAppLockChange(enabled: Boolean) {
+        if (enabled == appLockEnabled) return
+
+        requestUnlock(
+            title = if (enabled) "Enable App Lock" else "Turn Off App Lock",
+            subtitle = "Verify with device security.",
+            onSuccess = {
+                settingsStore.setAppLockEnabled(enabled)
+                appLockEnabled = enabled
+                appUnlocked = true
+                accountMessage = if (enabled) {
+                    "App Lock is enabled."
+                } else {
+                    "App Lock is off."
+                }
+            }
+        )
+    }
+
     LaunchedEffect(repository) {
         val persisted = withContext(Dispatchers.IO) {
             repository.load()
@@ -110,18 +159,20 @@ fun SuslogApp() {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            AppBottomBar(
-                currentDestination = currentDestination,
-                plusExpanded = showCreateMenu,
-                onDestinationClick = {
-                    currentDestination = it
-                    showAddCar = false
-                    showAddConfig = false
-                    showAddDocument = false
-                    showCreateMenu = false
-                },
-                onPlusClick = { showCreateMenu = !showCreateMenu }
-            )
+            if (appUnlocked) {
+                AppBottomBar(
+                    currentDestination = currentDestination,
+                    plusExpanded = showCreateMenu,
+                    onDestinationClick = {
+                        currentDestination = it
+                        showAddCar = false
+                        showAddConfig = false
+                        showAddDocument = false
+                        showCreateMenu = false
+                    },
+                    onPlusClick = { showCreateMenu = !showCreateMenu }
+                )
+            }
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -330,9 +381,12 @@ fun SuslogApp() {
                     modifier = Modifier.padding(innerPadding)
                 )
 
-                AppDestination.SETTINGS -> PlaceholderScreen(
-                    title = "settings",
-                    body = "Vehicle profiles, units, and app preferences will live here.",
+                AppDestination.SETTINGS -> SettingsScreen(
+                    appLockEnabled = appLockEnabled,
+                    biometricStatus = biometricStatus,
+                    accountMessage = accountMessage,
+                    onAppLockChange = ::requestAppLockChange,
+                    onUnlockNow = { requestUnlock() },
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -396,6 +450,69 @@ fun SuslogApp() {
                         showCreateMenu = false
                     }
                 )
+            }
+
+            if (!appUnlocked) {
+                AppLockOverlay(
+                    biometricStatus = biometricStatus,
+                    accountMessage = accountMessage,
+                    onUnlock = { requestUnlock() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppLockOverlay(
+    biometricStatus: BiometricAuthStatus,
+    accountMessage: String?,
+    onUnlock: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Suslog Locked",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = if (biometricStatus == BiometricAuthStatus.AVAILABLE) {
+                    "Use device security to unlock your setup data."
+                } else {
+                    "Device security is unavailable on this device."
+                },
+                modifier = Modifier.padding(top = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            accountMessage?.let {
+                Text(
+                    text = it,
+                    modifier = Modifier.padding(top = 12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Button(
+                onClick = onUnlock,
+                enabled = biometricStatus == BiometricAuthStatus.AVAILABLE,
+                modifier = Modifier
+                    .padding(top = 20.dp)
+                    .fillMaxWidth()
+                    .widthIn(max = 320.dp)
+            ) {
+                Text("Unlock")
             }
         }
     }

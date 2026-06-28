@@ -121,18 +121,6 @@ fun SetupConfigState.toClickEntities(stateId: Long): List<SetupConfigStateClickE
         }
     }
 
-fun SetupConfig.toLegacyClickEntities(): List<SetupConfigClickEntity> =
-    setup.flatMap { (corner, values) ->
-        values.map { (adjusterLabel, clickValue) ->
-            SetupConfigClickEntity(
-                configId = id,
-                corner = corner.name,
-                adjusterLabel = adjusterLabel,
-                clickValue = clickValue
-            )
-        }
-    }
-
 fun SetupConfigStateEntity.toDomain(
     clicks: List<SetupConfigStateClickEntity>,
 ): SetupConfigState {
@@ -170,40 +158,6 @@ fun setupConfigFromEntities(
         states = states,
         createdAtMillis = config.createdAtMillis
     )
-
-fun legacySetupConfigFromEntities(
-    config: SetupConfigEntity,
-    clicks: List<SetupConfigClickEntity>,
-): SetupConfig {
-    val setup: SetupValues = clicks
-        .groupBy { Corner.valueOf(it.corner) }
-        .mapValues { (_, cornerClicks) ->
-            cornerClicks.associate { click ->
-                click.adjusterLabel to click.clickValue
-            }
-        }
-
-    return SetupConfig(
-        id = config.id,
-        carId = config.carId,
-        name = config.name,
-        states = listOf(
-            SetupConfigState(
-                setup = setup,
-                cornerEntryBalance = config.cornerEntryBalance,
-                cornerMidBalance = 0,
-                cornerExitBalance = config.cornerExitBalance,
-                overallGrip = 3,
-                bodyControlBalance = 0,
-                lapTimeMillis = config.lapTimeMillis,
-                timestampMillis = config.updatedAtMillis,
-                note = null,
-                hasFeedback = true
-            )
-        ),
-        createdAtMillis = config.createdAtMillis
-    )
-}
 
 fun TuningDocument.toEntity(): TuningDocumentEntity =
     TuningDocumentEntity(

@@ -22,9 +22,6 @@ interface SuslogDao {
     @Query("SELECT * FROM setup_configs ORDER BY updatedAtMillis DESC")
     suspend fun getSetupConfigs(): List<SetupConfigEntity>
 
-    @Query("SELECT * FROM setup_config_clicks WHERE configId IN (:configIds)")
-    suspend fun getClicksForConfigs(configIds: List<String>): List<SetupConfigClickEntity>
-
     @Query("SELECT * FROM setup_config_states WHERE configId IN (:configIds) ORDER BY id ASC")
     suspend fun getSetupConfigStates(configIds: List<String>): List<SetupConfigStateEntity>
 
@@ -58,9 +55,6 @@ interface SuslogDao {
 
     @Insert
     suspend fun insertSetupConfig(config: SetupConfigEntity)
-
-    @Insert
-    suspend fun insertSetupConfigClicks(clicks: List<SetupConfigClickEntity>)
 
     @Insert
     suspend fun insertSetupConfigState(state: SetupConfigStateEntity): Long
@@ -122,11 +116,11 @@ interface SuslogDao {
         updatedAtMillis: Long,
     )
 
-    @Query("DELETE FROM setup_config_clicks WHERE configId = :configId")
-    suspend fun deleteSetupConfigClicks(configId: String)
-
     @Query("DELETE FROM setup_configs WHERE id = :configId")
     suspend fun deleteSetupConfig(configId: String)
+
+    @Query("DELETE FROM cars")
+    suspend fun deleteAllCars()
 
     @Transaction
     suspend fun insertCarWithInitialState(
@@ -171,7 +165,6 @@ interface SuslogDao {
     suspend fun insertSetupConfigSnapshot(config: SetupConfig): Long {
         insertSetupConfig(config.toEntity())
         val stateId = upsertCurrentSetupConfigState(config)
-        insertSetupConfigClicks(config.toLegacyClickEntities())
 
         return stateId
     }
@@ -188,8 +181,6 @@ interface SuslogDao {
             lapTimeMillis = entity.lapTimeMillis,
             updatedAtMillis = entity.updatedAtMillis
         )
-        deleteSetupConfigClicks(entity.id)
-        insertSetupConfigClicks(config.toLegacyClickEntities())
 
         return upsertCurrentSetupConfigState(config)
     }

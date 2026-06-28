@@ -1,7 +1,6 @@
 package com.example.suslog.data.repository
 
 import com.example.suslog.data.local.SuslogDao
-import com.example.suslog.data.local.legacySetupConfigFromEntities
 import com.example.suslog.data.local.setupConfigFromEntities
 import com.example.suslog.data.local.setupStateFromEntities
 import com.example.suslog.data.local.toAdjusterEntities
@@ -81,6 +80,10 @@ class SetupRepository(
         dao.deleteSetupConfig(configId)
     }
 
+    suspend fun clearLocalData() {
+        dao.deleteAllCars()
+    }
+
     suspend fun addTuningDocument(document: TuningDocument) {
         dao.insertTuningDocument(document.toEntity())
     }
@@ -100,22 +103,12 @@ class SetupRepository(
             dao.getClicksForConfigStates(stateEntities.map { it.id })
                 .groupBy { it.stateId }
         }
-        val legacyClicksByConfig = dao.getClicksForConfigs(configIds)
-            .groupBy { it.configId }
-
         return configEntities.map { config ->
             val states = statesByConfig[config.id].orEmpty().map { state ->
                 state.toDomain(clicksByState[state.id].orEmpty())
             }
 
-            if (states.isNotEmpty()) {
-                setupConfigFromEntities(config = config, states = states)
-            } else {
-                legacySetupConfigFromEntities(
-                    config = config,
-                    clicks = legacyClicksByConfig[config.id].orEmpty()
-                )
-            }
+            setupConfigFromEntities(config = config, states = states)
         }
     }
 

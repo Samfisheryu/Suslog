@@ -1,5 +1,7 @@
 package com.example.suslog.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -35,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.suslog.data.export.SuslogExportJson
 import com.example.suslog.data.local.SuslogDatabase
 import com.example.suslog.data.repository.SetupRepository
 import com.example.suslog.domain.car.CarProfile
@@ -64,6 +67,9 @@ import com.example.suslog.ui.tuning.TuningScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun SuslogApp(
@@ -81,6 +87,8 @@ fun SuslogApp(
     var appLockEnabled by remember { mutableStateOf(settingsStore.isAppLockEnabled()) }
     var appUnlocked by remember { mutableStateOf(!appLockEnabled) }
     var accountMessage by remember { mutableStateOf<String?>(null) }
+    var dataMessage by remember { mutableStateOf<String?>(null) }
+    var pendingExportJson by remember { mutableStateOf<String?>(null) }
     var cars by remember { mutableStateOf<List<CarProfile>>(emptyList()) }
     var setupStateMachinesByCar by remember {
         mutableStateOf<Map<String, SetupStateMachine>>(emptyMap())
@@ -122,6 +130,38 @@ fun SuslogApp(
         showPreviousFeedbackReference = showPreviousFeedbackReference,
         showSetupDebugInfo = showSetupDebugInfo
     )
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        val json = pendingExportJson
+        pendingExportJson = null
+
+        if (uri == null) {
+            dataMessage = "Export cancelled."
+            return@rememberLauncherForActivityResult
+        }
+        if (json == null) {
+            dataMessage = "Export failed: no data was prepared."
+            return@rememberLauncherForActivityResult
+        }
+
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(json.toByteArray(Charsets.UTF_8))
+                    } ?: error("Could not open export file.")
+                }
+            }
+
+            dataMessage = result.fold(
+                onSuccess = { "Export complete." },
+                onFailure = { error ->
+                    "Export failed: ${error.message ?: "unknown error"}"
+                }
+            )
+        }
+    }
 
     fun requestUnlock(
         title: String = "Unlock Suslog",
@@ -433,10 +473,45 @@ fun SuslogApp(
                     appLockEnabled = appLockEnabled,
                     biometricStatus = biometricStatus,
                     accountMessage = accountMessage,
+                    dataMessage = dataMessage,
                     setupDefaults = setupDefaults,
                     tuningPreferences = tuningPreferences,
                     onAppLockChange = ::requestAppLockChange,
                     onUnlockNow = { requestUnlock() },
+                    onExportData = {
+                        pendingExportJson = SuslogExportJson.build(
+                            cars = cars,
+                            setupStateMachinesByCar = setupStateMachinesByCar,
+                            setupConfigs = setupConfigs,
+                            tuningDocuments = tuningDocuments,
+                            setupDefaults = setupDefaults,
+                            tuningPreferences = tuningPreferences
+                        )
+                        exportLauncher.launch(suslogExportFileName())
+                    },
+                    onClearLocalData = {
+                        dataMessage = "Clearing local data..."
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                repository.clearLocalData()
+                            }
+
+                            cars = emptyList()
+                            setupStateMachinesByCar = emptyMap()
+                            draftSetupByCar = emptyMap()
+                            setupConfigs = emptyList()
+                            tuningDocuments = emptyList()
+                            setupRecommendationByCar = emptyMap()
+                            selectedConfigIdByCar = emptyMap()
+                            activeConfigIdByCar = emptyMap()
+                            selectedCarId = null
+                            showAddCar = false
+                            showAddConfig = false
+                            showAddDocument = false
+                            showCreateMenu = false
+                            dataMessage = "Local data cleared."
+                        }
+                    },
                     onDefaultAxleLockChange = {
                         axleLockEnabled = it
                         settingsStore.setDefaultAxleLockEnabled(it)
@@ -650,3 +725,11 @@ private fun SetupValues.alignedTo(car: CarProfile): SetupValues =
             adjuster.label to (existingValue ?: adjuster.defaultClick())
         }
     }
+
+private fun suslogExportFileName(
+    timestampMillis: Long = System.currentTimeMillis(),
+): String {
+    val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(timestampMillis))
+
+    return "suslog-export-$date.json"
+}

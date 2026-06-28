@@ -95,26 +95,6 @@ data class SetupConfigEntity(
 )
 
 @Entity(
-    tableName = "setup_config_clicks",
-    primaryKeys = ["configId", "corner", "adjusterLabel"],
-    foreignKeys = [
-        ForeignKey(
-            entity = SetupConfigEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["configId"],
-            onDelete = ForeignKey.CASCADE
-        )
-    ],
-    indices = [Index("configId")]
-)
-data class SetupConfigClickEntity(
-    val configId: String,
-    val corner: String,
-    val adjusterLabel: String,
-    val clickValue: Int,
-)
-
-@Entity(
     tableName = "setup_config_states",
     foreignKeys = [
         ForeignKey(

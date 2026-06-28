@@ -58,6 +58,7 @@ import com.example.suslog.settings.SetupDefaults
 import com.example.suslog.ui.common.BalanceSelector
 import com.example.suslog.ui.common.ChoiceButton
 import com.example.suslog.ui.common.LabeledScaleSelector
+import com.example.suslog.ui.common.SectionHeader
 import com.example.suslog.ui.common.SetupCornerCard
 import com.example.suslog.ui.common.bodyControlLabel
 import com.example.suslog.ui.common.formatLapTime
@@ -730,26 +731,18 @@ private fun ConfigFeedbackPanel(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Config Feedback",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                FitText(
-                    text = activeConfig?.name ?: "Current",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp)
-                )
-            }
+            SectionHeader(
+                title = "Config Feedback",
+                trailing = {
+                    FitText(
+                        text = activeConfig?.name ?: "Current",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.widthIn(max = 140.dp)
+                    )
+                }
+            )
 
             BalanceSelector(
                 title = "Corner Entry",

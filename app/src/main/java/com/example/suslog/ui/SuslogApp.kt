@@ -49,7 +49,6 @@ import com.example.suslog.domain.setup.initialSetupStateMachine
 import com.example.suslog.domain.setup.withAdjustedAxleMatchedClick
 import com.example.suslog.domain.setup.withAdjustedClick
 import com.example.suslog.domain.setup.defaultClick
-import com.example.suslog.domain.suspension.AdjusterSpec
 import com.example.suslog.domain.suspension.Corner
 import com.example.suslog.domain.tuning.TuningDocument
 import com.example.suslog.settings.AppSettingsStore

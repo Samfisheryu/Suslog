@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
@@ -63,7 +61,9 @@ import com.example.suslog.domain.tuning.SetupChangeType
 import com.example.suslog.domain.tuning.TuningRecommendation
 import com.example.suslog.domain.tuning.buildTuningRecommendation
 import com.example.suslog.domain.tuning.summarizeSetupChange
+import com.example.suslog.ui.common.DashedRule
 import com.example.suslog.ui.common.FitText
+import com.example.suslog.ui.common.TelemetryCard
 import com.example.suslog.ui.common.formatLapTime
 import com.example.suslog.ui.theme.SuslogTheme
 import kotlin.math.PI
@@ -116,7 +116,7 @@ fun TuningHistoryScreen(
             onBack = onBack
         )
 
-        TuningCard(title = "Tuning History", meta = "${states.size} STATES") {
+        TelemetryCard(title = "Tuning History", meta = "${states.size} STATES") {
             StateTimeline(
                 stateCount = states.size,
                 selectedStateIndex = selectedStateIndex,
@@ -131,7 +131,7 @@ fun TuningHistoryScreen(
         )
 
         if (selectedState != null) {
-            TuningCard(
+            TelemetryCard(
                 title = "State ${selectedStateIndex + 1} · Analysis",
                 meta = "SUBJECTIVE · V1"
             ) {
@@ -150,7 +150,7 @@ fun TuningHistoryScreen(
                 }
             }
 
-            TuningCard(title = "Selected State Setup") {
+            TelemetryCard(title = "Selected State Setup") {
                 SelectedStateSetup(
                     car = car,
                     state = selectedState,
@@ -160,7 +160,7 @@ fun TuningHistoryScreen(
         }
 
         if (hasAnyFeedback) {
-            TuningCard(title = "Balance Trend", meta = "NEUTRAL = 0") {
+            TelemetryCard(title = "Balance Trend", meta = "NEUTRAL = 0") {
                 TrendHeader(
                     left = "Entry / Mid / Exit",
                     right = "Neutral target"
@@ -174,12 +174,12 @@ fun TuningHistoryScreen(
         }
 
         if (selectedState != null) {
-            TuningCard(title = "Note") {
+            TelemetryCard(title = "Note") {
                 SelectedStateNote(state = selectedState)
             }
         }
 
-        TuningCard(title = "Lap Time Trend", meta = "LOWER = FASTER") {
+        TelemetryCard(title = "Lap Time Trend", meta = "LOWER = FASTER") {
             TrendHeader(
                 left = "Lower is faster",
                 right = bestLap?.let { "Best ${it.formatLapTime()}" } ?: "No lap data"
@@ -231,76 +231,7 @@ private fun TuningHistoryHeader(
     }
 }
 
-// ───────────────────────── shared telemetry chrome ─────────────────────────
-
-@Composable
-private fun TuningCard(
-    title: String,
-    meta: String? = null,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SectionHeader(title = title, meta = meta)
-            content()
-        }
-    }
-}
-
-@Composable
-private fun SectionHeader(
-    title: String,
-    meta: String?,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(9.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(width = 3.dp, height = 13.dp)
-                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(1.dp))
-        )
-        Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        DashedRule(modifier = Modifier.weight(1f))
-        meta?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun DashedRule(modifier: Modifier = Modifier) {
-    val color = MaterialTheme.colorScheme.outline
-    Canvas(modifier = modifier.height(1.dp)) {
-        drawLine(
-            color = color,
-            start = Offset(0f, size.height / 2f),
-            end = Offset(size.width, size.height / 2f),
-            strokeWidth = size.height,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 6f))
-        )
-    }
-}
+// Section chrome (TelemetryCard / SectionHeader / DashedRule) lives in ui/common/TelemetryCard.kt
 
 @Composable
 private fun StatusPill(

@@ -43,6 +43,7 @@ import com.example.suslog.settings.BiometricAuthStatus
 import com.example.suslog.settings.SetupDefaults
 import com.example.suslog.settings.TuningPreferences
 import com.example.suslog.ui.common.ChoiceButton
+import com.example.suslog.ui.common.SectionHeader
 import com.example.suslog.ui.theme.SuslogTheme
 
 @Composable
@@ -241,26 +242,18 @@ private fun SettingsSection(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title.uppercase(),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = if (expanded) "-" else "+",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            SectionHeader(
+                title = title,
+                modifier = Modifier.clickable { expanded = !expanded },
+                trailing = {
+                    Text(
+                        text = if (expanded) "-" else "+",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            )
             AnimatedVisibility(visible = expanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     content()

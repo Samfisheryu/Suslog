@@ -52,6 +52,8 @@ import com.example.suslog.domain.tuning.TuningDocument
 import com.example.suslog.settings.AppSettingsStore
 import com.example.suslog.settings.BiometricAuth
 import com.example.suslog.settings.BiometricAuthStatus
+import com.example.suslog.settings.SetupDefaults
+import com.example.suslog.settings.TuningPreferences
 import com.example.suslog.ui.config.ConfigScreen
 import com.example.suslog.ui.navigation.AppBottomBar
 import com.example.suslog.ui.navigation.AppDestination
@@ -98,8 +100,28 @@ fun SuslogApp(
     var showAddConfig by remember { mutableStateOf(false) }
     var showAddDocument by remember { mutableStateOf(false) }
     var showCreateMenu by remember { mutableStateOf(false) }
-    var axleLockEnabled by rememberSaveable { mutableStateOf(true) }
-    var showSetupDebugInfo by rememberSaveable { mutableStateOf(false) }
+    var axleLockEnabled by remember { mutableStateOf(settingsStore.isDefaultAxleLockEnabled()) }
+    var defaultSuspensionType by remember { mutableStateOf(settingsStore.defaultSuspensionType()) }
+    var defaultMaxClicks by remember { mutableStateOf(settingsStore.defaultMaxClicks()) }
+    var defaultStiffSide by remember { mutableStateOf(settingsStore.defaultStiffSide()) }
+    var requireFeedbackBeforeExitConfig by remember {
+        mutableStateOf(settingsStore.requireFeedbackBeforeExitConfig())
+    }
+    var showPreviousFeedbackReference by remember {
+        mutableStateOf(settingsStore.showPreviousFeedbackReference())
+    }
+    var showSetupDebugInfo by remember { mutableStateOf(settingsStore.showSetupDebugInfo()) }
+    val setupDefaults = SetupDefaults(
+        axleLockEnabled = axleLockEnabled,
+        suspensionType = defaultSuspensionType,
+        maxClicks = defaultMaxClicks,
+        stiffSide = defaultStiffSide
+    )
+    val tuningPreferences = TuningPreferences(
+        requireFeedbackBeforeExitConfig = requireFeedbackBeforeExitConfig,
+        showPreviousFeedbackReference = showPreviousFeedbackReference,
+        showSetupDebugInfo = showSetupDebugInfo
+    )
 
     fun requestUnlock(
         title: String = "Unlock Suslog",
@@ -186,6 +208,9 @@ fun SuslogApp(
                     activeConfigIdByCar = activeConfigIdByCar,
                     selectedCarId = selectedCarId,
                     setupRecommendation = selectedCarId?.let { setupRecommendationByCar[it] },
+                    setupDefaults = setupDefaults,
+                    requireFeedbackBeforeExitConfig = requireFeedbackBeforeExitConfig,
+                    showPreviousFeedbackReference = showPreviousFeedbackReference,
                     axleLockEnabled = axleLockEnabled,
                     showDebugInfo = showSetupDebugInfo,
                     showAddCar = showAddCar,
@@ -303,7 +328,10 @@ fun SuslogApp(
                             setupRecommendationByCar = setupRecommendationByCar - carId
                         }
                     },
-                    onAxleLockEnabledChange = { axleLockEnabled = it },
+                    onAxleLockEnabledChange = {
+                        axleLockEnabled = it
+                        settingsStore.setDefaultAxleLockEnabled(it)
+                    },
                     modifier = Modifier.padding(innerPadding)
                 )
 
@@ -385,8 +413,38 @@ fun SuslogApp(
                     appLockEnabled = appLockEnabled,
                     biometricStatus = biometricStatus,
                     accountMessage = accountMessage,
+                    setupDefaults = setupDefaults,
+                    tuningPreferences = tuningPreferences,
                     onAppLockChange = ::requestAppLockChange,
                     onUnlockNow = { requestUnlock() },
+                    onDefaultAxleLockChange = {
+                        axleLockEnabled = it
+                        settingsStore.setDefaultAxleLockEnabled(it)
+                    },
+                    onDefaultSuspensionTypeChange = {
+                        defaultSuspensionType = it
+                        settingsStore.setDefaultSuspensionType(it)
+                    },
+                    onDefaultMaxClicksChange = {
+                        defaultMaxClicks = it
+                        settingsStore.setDefaultMaxClicks(it)
+                    },
+                    onDefaultStiffSideChange = {
+                        defaultStiffSide = it
+                        settingsStore.setDefaultStiffSide(it)
+                    },
+                    onRequireFeedbackBeforeExitConfigChange = {
+                        requireFeedbackBeforeExitConfig = it
+                        settingsStore.setRequireFeedbackBeforeExitConfig(it)
+                    },
+                    onShowPreviousFeedbackReferenceChange = {
+                        showPreviousFeedbackReference = it
+                        settingsStore.setShowPreviousFeedbackReference(it)
+                    },
+                    onShowSetupDebugInfoChange = {
+                        showSetupDebugInfo = it
+                        settingsStore.setShowSetupDebugInfo(it)
+                    },
                     modifier = Modifier.padding(innerPadding)
                 )
             }

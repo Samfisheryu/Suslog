@@ -54,6 +54,7 @@ import com.example.suslog.domain.suspension.SuspensionType
 import com.example.suslog.domain.tuning.Axle
 import com.example.suslog.domain.tuning.AxleSideMismatch
 import com.example.suslog.domain.tuning.findAxleSideMismatches
+import com.example.suslog.settings.SetupDefaults
 import com.example.suslog.ui.common.BalanceSelector
 import com.example.suslog.ui.common.ChoiceButton
 import com.example.suslog.ui.common.LabeledScaleSelector
@@ -80,6 +81,9 @@ fun SetupScreen(
     activeConfigIdByCar: Map<String, String?>,
     selectedCarId: String?,
     setupRecommendation: SetupRecommendation?,
+    setupDefaults: SetupDefaults,
+    requireFeedbackBeforeExitConfig: Boolean,
+    showPreviousFeedbackReference: Boolean,
     axleLockEnabled: Boolean,
     showDebugInfo: Boolean,
     showAddCar: Boolean,
@@ -108,6 +112,7 @@ fun SetupScreen(
 
     if (showAddCar) {
         AddCarScreen(
+            setupDefaults = setupDefaults,
             onAddCar = {
                 onAddCar(it)
                 onShowAddCarChange(false)
@@ -145,6 +150,8 @@ fun SetupScreen(
             setupRecommendation = selectedCar?.let { car ->
                 setupRecommendation?.takeIf { it.carId == car.id }
             },
+            requireFeedbackBeforeExitConfig = requireFeedbackBeforeExitConfig,
+            showPreviousFeedbackReference = showPreviousFeedbackReference,
             axleLockEnabled = axleLockEnabled,
             showDebugInfo = showDebugInfo,
             onSelectCar = onSelectCar,
@@ -190,6 +197,8 @@ private fun CurrentSetupScreen(
     selectedConfig: SetupConfig?,
     activeConfig: SetupConfig?,
     setupRecommendation: SetupRecommendation?,
+    requireFeedbackBeforeExitConfig: Boolean,
+    showPreviousFeedbackReference: Boolean,
     axleLockEnabled: Boolean,
     showDebugInfo: Boolean,
     onSelectCar: (String) -> Unit,
@@ -214,6 +223,7 @@ private fun CurrentSetupScreen(
         activeConfigState?.setup == setup &&
         activeConfigState.hasFeedback
     val referenceFeedbackState = activeConfigState?.takeIf { state ->
+        showPreviousFeedbackReference &&
         state.hasFeedback && state.setup != setup
     }
     var cornerEntryBalance by remember(activeConfig?.id, setup) {
@@ -321,7 +331,7 @@ private fun CurrentSetupScreen(
             onSelectConfig = onSelectConfig,
             onEnterConfig = onEnterConfig,
             onExitConfig = {
-                if (activeConfig != null && !currentSetupHasFeedback) {
+                if (requireFeedbackBeforeExitConfig && activeConfig != null && !currentSetupHasFeedback) {
                     showWarningAndScrollToFeedback()
                 } else {
                     onExitConfig()
@@ -1168,6 +1178,12 @@ private fun carsCanChange(selectedCar: CarProfile?): Boolean =
 @Composable
 private fun AddCarScreen(
     onAddCar: (CarProfile) -> Unit,
+    setupDefaults: SetupDefaults = SetupDefaults(
+        axleLockEnabled = true,
+        suspensionType = SuspensionType.TWO_WAY,
+        maxClicks = 30,
+        stiffSide = StiffSide.HIGH_VALUE
+    ),
     modifier: Modifier = Modifier,
     onCancel: (() -> Unit)? = null,
     initialCar: CarProfile? = null,
@@ -1176,13 +1192,13 @@ private fun AddCarScreen(
     val isEditing = initialCar != null
     var carName by remember(initialCar?.id) { mutableStateOf(initialCar?.name.orEmpty()) }
     var suspensionType by remember(initialCar?.id) {
-        mutableStateOf(initialCar?.suspensionType ?: SuspensionType.TWO_WAY)
+        mutableStateOf(initialCar?.suspensionType ?: setupDefaults.suspensionType)
     }
     var maxClicksText by remember(initialCar?.id) {
-        mutableStateOf((initialAdjuster?.maxClicks ?: 30).toString())
+        mutableStateOf((initialAdjuster?.maxClicks ?: setupDefaults.maxClicks).toString())
     }
     var stiffSide by remember(initialCar?.id) {
-        mutableStateOf(initialAdjuster?.stiffSide ?: StiffSide.HIGH_VALUE)
+        mutableStateOf(initialAdjuster?.stiffSide ?: setupDefaults.stiffSide)
     }
 
     val maxClicks = maxClicksText.toIntOrNull()
@@ -1383,6 +1399,8 @@ private fun CurrentSetupPreview() {
             selectedConfig = config,
             activeConfig = config,
             setupRecommendation = null,
+            requireFeedbackBeforeExitConfig = true,
+            showPreviousFeedbackReference = true,
             axleLockEnabled = true,
             showDebugInfo = true,
             onSelectCar = {},

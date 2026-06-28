@@ -31,6 +31,9 @@ data class SetupConfig(
     val lapTimeMillis: Long?
         get() = currentState?.lapTimeMillis
 
+    val hasFeedback: Boolean
+        get() = currentState?.hasFeedback == true
+
     val updatedAtMillis: Long
         get() = currentState?.timestampMillis ?: createdAtMillis
 
@@ -57,7 +60,8 @@ data class SetupConfig(
             bodyControlBalance = requireNotNull(feedback.bodyControlBalance),
             lapTimeMillis = feedback.lapTimeMillis,
             timestampMillis = timestampMillis,
-            note = feedback.note
+            note = feedback.note,
+            hasFeedback = true
         )
         val current = currentState
 
@@ -86,6 +90,7 @@ data class SetupConfigState(
     val timestampMillis: Long,
     val note: String? = null,
     val id: Long? = null,
+    val hasFeedback: Boolean = true,
 )
 
 data class SetupConfigFeedback(

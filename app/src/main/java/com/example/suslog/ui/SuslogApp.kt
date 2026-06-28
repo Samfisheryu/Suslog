@@ -260,7 +260,11 @@ fun SuslogApp() {
                     cars = cars,
                     selectedCarId = selectedCarId,
                     setupConfigs = setupConfigs,
-                    baseSetupByCar = draftSetupByCar,
+                    baseSetupByCar = cars.associate { car ->
+                        val currentSetup = setupStateMachinesByCar[car.id]?.currentState?.setup
+                            ?: car.defaultSetup()
+                        car.id to currentSetup
+                    },
                     showAddConfig = showAddConfig,
                     onShowAddConfigChange = { showAddConfig = it },
                     onSelectCar = { selectedCarId = it },

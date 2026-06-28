@@ -48,6 +48,8 @@ fun buildTuningRecommendation(
     selectedStateIndex: Int,
 ): TuningRecommendation {
     val cleanPoints = config.states.mapIndexedNotNull { index, state ->
+        if (!state.hasFeedback) return@mapIndexedNotNull null
+
         val summary = summarizeSetupChange(
             previousState = config.states.getOrNull(index - 1),
             currentState = state

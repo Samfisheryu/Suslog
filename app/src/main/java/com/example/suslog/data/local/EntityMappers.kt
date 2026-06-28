@@ -104,7 +104,8 @@ fun SetupConfig.currentStateEntity(): SetupConfigStateEntity {
         bodyControlBalance = state.bodyControlBalance,
         lapTimeMillis = state.lapTimeMillis,
         timestampMillis = state.timestampMillis,
-        note = state.note
+        note = state.note,
+        hasFeedback = state.hasFeedback
     )
 }
 
@@ -153,7 +154,8 @@ fun SetupConfigStateEntity.toDomain(
         lapTimeMillis = lapTimeMillis,
         timestampMillis = timestampMillis,
         note = note,
-        id = id
+        id = id,
+        hasFeedback = hasFeedback
     )
 }
 
@@ -195,7 +197,8 @@ fun legacySetupConfigFromEntities(
                 bodyControlBalance = 0,
                 lapTimeMillis = config.lapTimeMillis,
                 timestampMillis = config.updatedAtMillis,
-                note = null
+                note = null,
+                hasFeedback = true
             )
         ),
         createdAtMillis = config.createdAtMillis

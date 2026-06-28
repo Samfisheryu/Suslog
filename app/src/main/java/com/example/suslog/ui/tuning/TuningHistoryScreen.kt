@@ -100,6 +100,7 @@ fun TuningHistoryScreen(
         selectedStateIndex = selectedStateIndex
     )
     val bestLap = states.mapNotNull { it.lapTimeMillis }.minOrNull()
+    val hasAnyFeedback = states.any { it.hasFeedback }
 
     Column(
         modifier = modifier
@@ -134,11 +135,19 @@ fun TuningHistoryScreen(
                 title = "State ${selectedStateIndex + 1} · Analysis",
                 meta = "SUBJECTIVE · V1"
             ) {
-                AnalysisModule(
-                    state = selectedState,
-                    previousState = previousState,
-                    recommendation = recommendation
-                )
+                if (selectedState.hasFeedback) {
+                    AnalysisModule(
+                        state = selectedState,
+                        previousState = previousState?.takeIf { it.hasFeedback },
+                        recommendation = recommendation
+                    )
+                } else {
+                    Text(
+                        text = "No feedback shared for this state yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             TuningCard(title = "Selected State Setup") {
@@ -150,16 +159,18 @@ fun TuningHistoryScreen(
             }
         }
 
-        TuningCard(title = "Balance Trend", meta = "NEUTRAL = 0") {
-            TrendHeader(
-                left = "Entry / Mid / Exit",
-                right = "Neutral target"
-            )
-            BalanceTrendChart(
-                states = states,
-                selectedStateIndex = selectedStateIndex
-            )
-            BalanceLegend()
+        if (hasAnyFeedback) {
+            TuningCard(title = "Balance Trend", meta = "NEUTRAL = 0") {
+                TrendHeader(
+                    left = "Entry / Mid / Exit",
+                    right = "Neutral target"
+                )
+                BalanceTrendChart(
+                    states = states,
+                    selectedStateIndex = selectedStateIndex
+                )
+                BalanceLegend()
+            }
         }
 
         if (selectedState != null) {
@@ -1046,13 +1057,13 @@ private fun BalanceTrendChart(
         fun xFor(index: Int): Float = left + (right - left) * index / xRange
         fun yFor(value: Int): Float = centerY - value.coerceIn(-2, 2) * ((bottom - top) / 4f)
 
-        fun drawBalancePath(values: List<Int>, color: Color) {
-            if (values.size >= 2) {
+        fun drawBalancePath(points: List<Pair<Int, Int>>, color: Color) {
+            if (points.size >= 2) {
                 val path = Path()
-                values.forEachIndexed { index, value ->
-                    val x = xFor(index)
+                points.forEachIndexed { pathIndex, (stateIndex, value) ->
+                    val x = xFor(stateIndex)
                     val y = yFor(value)
-                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                    if (pathIndex == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
                 drawPath(
                     path = path,
@@ -1060,7 +1071,7 @@ private fun BalanceTrendChart(
                     style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                 )
             }
-            values.forEachIndexed { index, value ->
+            points.forEach { (index, value) ->
                 drawCircle(
                     color = color,
                     radius = 3.5.dp.toPx(),
@@ -1069,11 +1080,16 @@ private fun BalanceTrendChart(
             }
         }
 
-        drawBalancePath(states.map { it.cornerEntryBalance }, entryColor)
-        drawBalancePath(states.map { it.cornerMidBalance }, midColor)
-        drawBalancePath(states.map { it.cornerExitBalance }, exitColor)
+        fun feedbackPoints(valueForState: (SetupConfigState) -> Int): List<Pair<Int, Int>> =
+            states.mapIndexedNotNull { index, state ->
+                if (state.hasFeedback) index to valueForState(state) else null
+            }
 
-        states.getOrNull(selectedStateIndex)?.let { selectedState ->
+        drawBalancePath(feedbackPoints { it.cornerEntryBalance }, entryColor)
+        drawBalancePath(feedbackPoints { it.cornerMidBalance }, midColor)
+        drawBalancePath(feedbackPoints { it.cornerExitBalance }, exitColor)
+
+        states.getOrNull(selectedStateIndex)?.takeIf { it.hasFeedback }?.let { selectedState ->
             val x = xFor(selectedStateIndex)
             listOf(
                 selectedState.cornerEntryBalance,

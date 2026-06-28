@@ -81,7 +81,8 @@ interface SuslogDao {
             bodyControlBalance = :bodyControlBalance,
             lapTimeMillis = :lapTimeMillis,
             timestampMillis = :timestampMillis,
-            note = :note
+            note = :note,
+            hasFeedback = :hasFeedback
         WHERE id = :stateId
         """
     )
@@ -95,6 +96,7 @@ interface SuslogDao {
         lapTimeMillis: Long?,
         timestampMillis: Long,
         note: String?,
+        hasFeedback: Boolean,
     )
 
     @Query("DELETE FROM setup_config_state_clicks WHERE stateId = :stateId")
@@ -206,7 +208,8 @@ interface SuslogDao {
                 bodyControlBalance = state.bodyControlBalance,
                 lapTimeMillis = state.lapTimeMillis,
                 timestampMillis = state.timestampMillis,
-                note = state.note
+                note = state.note,
+                hasFeedback = state.hasFeedback
             )
             deleteSetupConfigStateClicks(existingStateId)
             existingStateId

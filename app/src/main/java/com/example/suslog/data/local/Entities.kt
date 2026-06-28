@@ -137,6 +137,7 @@ data class SetupConfigStateEntity(
     val lapTimeMillis: Long?,
     val timestampMillis: Long,
     val note: String?,
+    val hasFeedback: Boolean,
 )
 
 @Entity(

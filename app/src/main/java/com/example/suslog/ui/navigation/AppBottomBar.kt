@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -16,13 +17,13 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.suslog.ui.common.FitText
@@ -77,7 +78,7 @@ fun AppBottomBar(
                 modifier = Modifier.weight(1f)
             )
             Box(
-                modifier = Modifier.size(76.dp),
+                modifier = Modifier.size(64.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -129,12 +130,16 @@ private fun BottomBarTab(
     onClick: (AppDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    TextButton(
-        onClick = { onClick(destination) },
+    Box(
         modifier = modifier
+            .height(56.dp)
+            .clickable { onClick(destination) },
+        contentAlignment = Alignment.Center
     ) {
         FitText(
             text = destination.label,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
             color = if (selected) {
                 MaterialTheme.colorScheme.primary
             } else {
@@ -142,7 +147,7 @@ private fun BottomBarTab(
             },
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             style = MaterialTheme.typography.labelLarge,
-            minFontSize = 8.sp
+            minFontSize = 11.sp
         )
     }
 }

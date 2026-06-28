@@ -25,7 +25,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -283,19 +282,27 @@ private fun SetupConfigSummaryCard(
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                BalanceSummary(
-                    title = "Entry",
-                    value = config.cornerEntryBalance,
-                    modifier = Modifier.weight(1f)
-                )
-                BalanceSummary(
-                    title = "Exit",
-                    value = config.cornerExitBalance,
-                    modifier = Modifier.weight(1f)
+            if (config.hasFeedback) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    BalanceSummary(
+                        title = "Entry",
+                        value = config.cornerEntryBalance,
+                        modifier = Modifier.weight(1f)
+                    )
+                    BalanceSummary(
+                        title = "Exit",
+                        value = config.cornerExitBalance,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            } else {
+                Text(
+                    text = "Feedback not shared",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -418,19 +425,19 @@ private fun ConfigEditor(
         mutableStateOf((initialConfig?.setup ?: initialSetup).alignedTo(car))
     }
     var cornerEntryBalance by remember(car.id, initialConfig?.id) {
-        mutableIntStateOf(initialConfig?.cornerEntryBalance ?: 0)
+        mutableStateOf(if (initialConfig?.hasFeedback == true) initialConfig.cornerEntryBalance else null)
     }
     var cornerMidBalance by remember(car.id, initialConfig?.id) {
-        mutableIntStateOf(initialConfig?.cornerMidBalance ?: 0)
+        mutableStateOf(if (initialConfig?.hasFeedback == true) initialConfig.cornerMidBalance else null)
     }
     var cornerExitBalance by remember(car.id, initialConfig?.id) {
-        mutableIntStateOf(initialConfig?.cornerExitBalance ?: 0)
+        mutableStateOf(if (initialConfig?.hasFeedback == true) initialConfig.cornerExitBalance else null)
     }
     var overallGrip by remember(car.id, initialConfig?.id) {
-        mutableIntStateOf(initialConfig?.overallGrip ?: 3)
+        mutableStateOf(if (initialConfig?.hasFeedback == true) initialConfig.overallGrip else null)
     }
     var bodyControlBalance by remember(car.id, initialConfig?.id) {
-        mutableIntStateOf(initialConfig?.bodyControlBalance ?: 0)
+        mutableStateOf(if (initialConfig?.hasFeedback == true) initialConfig.bodyControlBalance else null)
     }
     var lapTimeText by remember(car.id, initialConfig?.id) {
         mutableStateOf(initialConfig?.lapTimeMillis?.formatLapTime().orEmpty())
@@ -441,7 +448,19 @@ private fun ConfigEditor(
 
     val parsedLapTime = parseLapTimeMillis(lapTimeText)
     val lapTimeIsValid = lapTimeText.trim().isEmpty() || parsedLapTime != null
-    val canSave = name.trim().isNotEmpty() && lapTimeIsValid
+    val feedbackCoreHasContent = cornerEntryBalance != null ||
+        cornerMidBalance != null ||
+        cornerExitBalance != null ||
+        overallGrip != null ||
+        bodyControlBalance != null
+    val feedbackIsComplete = cornerEntryBalance != null &&
+        cornerMidBalance != null &&
+        cornerExitBalance != null &&
+        overallGrip != null &&
+        bodyControlBalance != null
+    val canSave = name.trim().isNotEmpty() &&
+        lapTimeIsValid &&
+        (!feedbackCoreHasContent || feedbackIsComplete)
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -544,28 +563,28 @@ private fun ConfigEditor(
             }
         }
 
-        ConfigSection(title = "Balance Notes") {
+        ConfigSection(title = "Feedback (Optional)") {
             BalanceSelector(
                 title = "Corner Entry",
                 value = cornerEntryBalance,
-                onValueChange = { cornerEntryBalance = it ?: 0 }
+                onValueChange = { cornerEntryBalance = it }
             )
             BalanceSelector(
                 title = "Mid Corner",
                 value = cornerMidBalance,
-                onValueChange = { cornerMidBalance = it ?: 0 }
+                onValueChange = { cornerMidBalance = it }
             )
             BalanceSelector(
                 title = "Corner Exit",
                 value = cornerExitBalance,
-                onValueChange = { cornerExitBalance = it ?: 0 }
+                onValueChange = { cornerExitBalance = it }
             )
             LabeledScaleSelector(
                 title = "Overall Grip",
                 value = overallGrip,
                 options = (1..5).toList(),
                 labelForValue = ::gripLabel,
-                onValueChange = { overallGrip = it ?: 3 },
+                onValueChange = { overallGrip = it },
                 startLabel = "Low",
                 endLabel = "High"
             )
@@ -574,10 +593,17 @@ private fun ConfigEditor(
                 value = bodyControlBalance,
                 options = (-2..2).toList(),
                 labelForValue = ::bodyControlLabel,
-                onValueChange = { bodyControlBalance = it ?: 0 },
+                onValueChange = { bodyControlBalance = it },
                 startLabel = "Too Stiff",
                 endLabel = "Too Much Roll"
             )
+            if (feedbackCoreHasContent && !feedbackIsComplete) {
+                Text(
+                    text = "Complete all five feedback fields, or clear them to save setup only.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
         }
 
         ConfigSection(title = "Lap Time") {
@@ -625,16 +651,18 @@ private fun ConfigEditor(
             Button(
                 onClick = {
                     val now = System.currentTimeMillis()
+                    val shouldSaveFeedback = feedbackIsComplete
                     val nextState = SetupConfigState(
                         setup = setup.alignedTo(car),
-                        cornerEntryBalance = cornerEntryBalance,
-                        cornerMidBalance = cornerMidBalance,
-                        cornerExitBalance = cornerExitBalance,
-                        overallGrip = overallGrip,
-                        bodyControlBalance = bodyControlBalance,
+                        cornerEntryBalance = cornerEntryBalance ?: 0,
+                        cornerMidBalance = cornerMidBalance ?: 0,
+                        cornerExitBalance = cornerExitBalance ?: 0,
+                        overallGrip = overallGrip ?: 3,
+                        bodyControlBalance = bodyControlBalance ?: 0,
                         lapTimeMillis = parsedLapTime,
                         timestampMillis = now,
-                        note = note.trim().ifEmpty { null }
+                        note = note.trim().ifEmpty { null },
+                        hasFeedback = shouldSaveFeedback
                     )
                     onSave(
                         initialConfig?.recordSnapshot(

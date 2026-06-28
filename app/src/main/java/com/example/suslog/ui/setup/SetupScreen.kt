@@ -209,8 +209,13 @@ private fun CurrentSetupScreen(
     val hasDraftChanges = selectedCar != null && currentState != null && setup != currentState.setup
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+    val activeConfigState = activeConfig?.currentState
     val currentSetupHasFeedback = activeConfig != null &&
-        activeConfig.currentState?.setup == setup
+        activeConfigState?.setup == setup &&
+        activeConfigState.hasFeedback
+    val referenceFeedbackState = activeConfigState?.takeIf { state ->
+        state.hasFeedback && state.setup != setup
+    }
     var cornerEntryBalance by remember(activeConfig?.id, setup) {
         mutableStateOf(if (currentSetupHasFeedback) activeConfig?.cornerEntryBalance else null)
     }
@@ -266,7 +271,8 @@ private fun CurrentSetupScreen(
         null
     }
     val hasFeedbackChanges = activeConfig != null && feedback != null && (
-        activeConfig.currentState?.setup != setup ||
+        activeConfigState?.setup != setup ||
+            activeConfigState?.hasFeedback != true ||
             feedback.cornerEntryBalance != activeConfig.cornerEntryBalance ||
             feedback.cornerMidBalance != activeConfig.cornerMidBalance ||
             feedback.cornerExitBalance != activeConfig.cornerExitBalance ||
@@ -457,6 +463,7 @@ private fun CurrentSetupScreen(
 
         ConfigFeedbackPanel(
             activeConfig = activeConfig,
+            referenceState = referenceFeedbackState,
             cornerEntryBalance = cornerEntryBalance,
             cornerMidBalance = cornerMidBalance,
             cornerExitBalance = cornerExitBalance,
@@ -679,6 +686,7 @@ private fun SetupRecommendationBar(
 @Composable
 private fun ConfigFeedbackPanel(
     activeConfig: SetupConfig?,
+    referenceState: SetupConfigState?,
     cornerEntryBalance: Int?,
     cornerMidBalance: Int?,
     cornerExitBalance: Int?,
@@ -699,6 +707,8 @@ private fun ConfigFeedbackPanel(
     modifier: Modifier = Modifier,
 ) {
     val enabled = activeConfig != null
+    val referenceLapTime = referenceState?.lapTimeMillis?.formatLapTime()
+    val referenceNote = referenceState?.note?.takeIf { it.isNotBlank() }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -735,19 +745,22 @@ private fun ConfigFeedbackPanel(
                 title = "Corner Entry",
                 value = cornerEntryBalance,
                 onValueChange = onCornerEntryBalanceChange,
-                enabled = enabled
+                enabled = enabled,
+                referenceValue = referenceState?.cornerEntryBalance
             )
             BalanceSelector(
                 title = "Mid Corner",
                 value = cornerMidBalance,
                 onValueChange = onCornerMidBalanceChange,
-                enabled = enabled
+                enabled = enabled,
+                referenceValue = referenceState?.cornerMidBalance
             )
             BalanceSelector(
                 title = "Corner Exit",
                 value = cornerExitBalance,
                 onValueChange = onCornerExitBalanceChange,
-                enabled = enabled
+                enabled = enabled,
+                referenceValue = referenceState?.cornerExitBalance
             )
             LabeledScaleSelector(
                 title = "Overall Grip",
@@ -756,6 +769,7 @@ private fun ConfigFeedbackPanel(
                 labelForValue = ::gripLabel,
                 onValueChange = onOverallGripChange,
                 enabled = enabled,
+                referenceValue = referenceState?.overallGrip,
                 startLabel = "Low",
                 endLabel = "High"
             )
@@ -766,6 +780,7 @@ private fun ConfigFeedbackPanel(
                 labelForValue = ::bodyControlLabel,
                 onValueChange = onBodyControlBalanceChange,
                 enabled = enabled,
+                referenceValue = referenceState?.bodyControlBalance,
                 startLabel = "Too Stiff",
                 endLabel = "Too Much Roll"
             )
@@ -775,6 +790,7 @@ private fun ConfigFeedbackPanel(
                 onValueChange = onLapTimeTextChange,
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Lap Time") },
+                placeholder = referenceLapTime?.let { { Text("Previous: $it") } },
                 singleLine = true,
                 enabled = enabled,
                 isError = enabled && !lapTimeIsValid,
@@ -793,6 +809,7 @@ private fun ConfigFeedbackPanel(
                 onValueChange = onNoteChange,
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Note") },
+                placeholder = referenceNote?.let { { Text("Previous: $it") } },
                 minLines = 2,
                 maxLines = 4,
                 enabled = enabled

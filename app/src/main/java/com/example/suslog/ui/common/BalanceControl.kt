@@ -26,7 +26,10 @@ fun BalanceSelector(
     onValueChange: (Int?) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    referenceValue: Int? = null,
 ) {
+    val showingReference = value == null && referenceValue != null
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -47,9 +50,15 @@ fun BalanceSelector(
                 }
             )
             Text(
-                text = value?.let(::balanceLabel) ?: "Not Shared",
+                text = value?.let(::balanceLabel)
+                    ?: referenceValue?.let { "Prev ${balanceLabel(it)}" }
+                    ?: "Not Shared",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (showingReference) {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
             )
         }
         Row(
@@ -65,6 +74,7 @@ fun BalanceSelector(
             )
             BalanceOptionDots(
                 value = value,
+                referenceValue = referenceValue,
                 onValueChange = onValueChange,
                 enabled = enabled
             )
@@ -82,6 +92,7 @@ fun BalanceSelector(
 @Composable
 private fun BalanceOptionDots(
     value: Int?,
+    referenceValue: Int?,
     onValueChange: (Int?) -> Unit,
     enabled: Boolean,
     modifier: Modifier = Modifier,
@@ -93,6 +104,7 @@ private fun BalanceOptionDots(
     ) {
         (-2..2).forEach { option ->
             val selected = option == value
+            val referenced = value == null && option == referenceValue
             Surface(
                 modifier = Modifier
                     .size(if (selected) 34.dp else 30.dp)
@@ -108,12 +120,14 @@ private fun BalanceOptionDots(
                 color = when {
                     !enabled -> MaterialTheme.colorScheme.surfaceVariant
                     selected -> MaterialTheme.colorScheme.primary
+                    referenced -> MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)
                     else -> MaterialTheme.colorScheme.surface
                 },
                 border = BorderStroke(
                     width = 1.dp,
                     color = when {
                         selected && enabled -> MaterialTheme.colorScheme.primary
+                        referenced && enabled -> MaterialTheme.colorScheme.primary.copy(alpha = 0.36f)
                         else -> MaterialTheme.colorScheme.outlineVariant
                     }
                 )
@@ -140,9 +154,12 @@ fun LabeledScaleSelector(
     onValueChange: (Int?) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    referenceValue: Int? = null,
     startLabel: String = labelForValue(options.first()),
     endLabel: String = labelForValue(options.last()),
 ) {
+    val showingReference = value == null && referenceValue != null
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -163,9 +180,15 @@ fun LabeledScaleSelector(
                 }
             )
             Text(
-                text = value?.let(labelForValue) ?: "Not Shared",
+                text = value?.let(labelForValue)
+                    ?: referenceValue?.let { "Prev ${labelForValue(it)}" }
+                    ?: "Not Shared",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (showingReference) {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 textAlign = TextAlign.End
             )
         }
@@ -186,6 +209,7 @@ fun LabeledScaleSelector(
             ) {
                 options.forEach { option ->
                     val selected = option == value
+                    val referenced = value == null && option == referenceValue
                     Surface(
                         modifier = Modifier
                             .size(if (selected) 34.dp else 30.dp)
@@ -201,12 +225,14 @@ fun LabeledScaleSelector(
                         color = when {
                             !enabled -> MaterialTheme.colorScheme.surfaceVariant
                             selected -> MaterialTheme.colorScheme.primary
+                            referenced -> MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)
                             else -> MaterialTheme.colorScheme.surface
                         },
                         border = BorderStroke(
                             width = 1.dp,
                             color = when {
                                 selected && enabled -> MaterialTheme.colorScheme.primary
+                                referenced && enabled -> MaterialTheme.colorScheme.primary.copy(alpha = 0.36f)
                                 else -> MaterialTheme.colorScheme.outlineVariant
                             }
                         )

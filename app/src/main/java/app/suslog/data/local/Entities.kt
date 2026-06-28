@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "cars")
 data class CarEntity(
     @PrimaryKey val id: String,
+    val localUserId: String,
     val name: String,
     val suspensionType: String,
 )

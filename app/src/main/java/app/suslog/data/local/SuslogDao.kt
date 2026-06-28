@@ -10,8 +10,8 @@ import app.suslog.domain.setup.SetupState
 @Dao
 interface SuslogDao {
     @Transaction
-    @Query("SELECT * FROM cars ORDER BY name")
-    suspend fun getCarsWithAdjusters(): List<CarWithAdjusters>
+    @Query("SELECT * FROM cars WHERE localUserId = :localUserId ORDER BY name")
+    suspend fun getCarsWithAdjusters(localUserId: String): List<CarWithAdjusters>
 
     @Query("SELECT * FROM setup_states WHERE carId = :carId ORDER BY id ASC")
     suspend fun getSetupStates(carId: String): List<SetupStateEntity>
@@ -19,8 +19,16 @@ interface SuslogDao {
     @Query("SELECT * FROM setup_clicks WHERE stateId IN (:stateIds)")
     suspend fun getClicksForStates(stateIds: List<Long>): List<SetupClickEntity>
 
-    @Query("SELECT * FROM setup_configs ORDER BY updatedAtMillis DESC")
-    suspend fun getSetupConfigs(): List<SetupConfigEntity>
+    @Query(
+        """
+        SELECT setup_configs.*
+        FROM setup_configs
+        INNER JOIN cars ON setup_configs.carId = cars.id
+        WHERE cars.localUserId = :localUserId
+        ORDER BY setup_configs.updatedAtMillis DESC
+        """
+    )
+    suspend fun getSetupConfigs(localUserId: String): List<SetupConfigEntity>
 
     @Query("SELECT * FROM setup_config_states WHERE configId IN (:configIds) ORDER BY id ASC")
     suspend fun getSetupConfigStates(configIds: List<String>): List<SetupConfigStateEntity>
@@ -28,8 +36,16 @@ interface SuslogDao {
     @Query("SELECT * FROM setup_config_state_clicks WHERE stateId IN (:stateIds)")
     suspend fun getClicksForConfigStates(stateIds: List<Long>): List<SetupConfigStateClickEntity>
 
-    @Query("SELECT * FROM tuning_documents ORDER BY createdAtMillis DESC")
-    suspend fun getTuningDocuments(): List<TuningDocumentEntity>
+    @Query(
+        """
+        SELECT tuning_documents.*
+        FROM tuning_documents
+        INNER JOIN cars ON tuning_documents.carId = cars.id
+        WHERE cars.localUserId = :localUserId
+        ORDER BY tuning_documents.createdAtMillis DESC
+        """
+    )
+    suspend fun getTuningDocuments(localUserId: String): List<TuningDocumentEntity>
 
     @Insert
     suspend fun insertCar(car: CarEntity)
@@ -119,8 +135,8 @@ interface SuslogDao {
     @Query("DELETE FROM setup_configs WHERE id = :configId")
     suspend fun deleteSetupConfig(configId: String)
 
-    @Query("DELETE FROM cars")
-    suspend fun deleteAllCars()
+    @Query("DELETE FROM cars WHERE localUserId = :localUserId")
+    suspend fun deleteCarsForLocalUser(localUserId: String)
 
     @Transaction
     suspend fun insertCarWithInitialState(

@@ -10,6 +10,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,12 +19,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,9 +41,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import app.suslog.R
 import app.suslog.data.export.SuslogExportJson
 import app.suslog.data.local.SuslogDatabase
 import app.suslog.data.repository.SetupRepository
@@ -54,6 +66,8 @@ import app.suslog.domain.tuning.TuningDocument
 import app.suslog.settings.AppSettingsStore
 import app.suslog.settings.BiometricAuth
 import app.suslog.settings.BiometricAuthStatus
+import app.suslog.settings.LocalAccount
+import app.suslog.settings.LocalAccountStore
 import app.suslog.settings.SetupDefaults
 import app.suslog.settings.TuningPreferences
 import app.suslog.ui.config.ConfigScreen
@@ -74,6 +88,7 @@ import java.util.Locale
 fun SuslogApp(
     settingsStore: AppSettingsStore,
     biometricAuth: BiometricAuth,
+    localAccountStore: LocalAccountStore,
 ) {
     val context = LocalContext.current
     val repository = remember {
@@ -84,7 +99,14 @@ fun SuslogApp(
 
     var currentDestination by rememberSaveable { mutableStateOf(AppDestination.SETUP) }
     var appLockEnabled by remember { mutableStateOf(settingsStore.isAppLockEnabled()) }
-    var appUnlocked by remember { mutableStateOf(!appLockEnabled) }
+    var localAccounts by remember { mutableStateOf(localAccountStore.accounts()) }
+    var activeLocalAccount by remember { mutableStateOf(localAccountStore.activeAccount()) }
+    var appUnlocked by remember {
+        mutableStateOf(activeLocalAccount != null && !appLockEnabled)
+    }
+    var biometricPromptRequested by remember { mutableStateOf(false) }
+    var localAccountDialogMode by remember { mutableStateOf<LocalAccountDialogMode?>(null) }
+    var localAccountDialogMessage by remember { mutableStateOf<String?>(null) }
     var accountMessage by remember { mutableStateOf<String?>(null) }
     var dataMessage by remember { mutableStateOf<String?>(null) }
     var pendingExportJson by remember { mutableStateOf<String?>(null) }
@@ -162,6 +184,74 @@ fun SuslogApp(
         }
     }
 
+    fun clearSetupSession() {
+        cars = emptyList()
+        setupStateMachinesByCar = emptyMap()
+        draftSetupByCar = emptyMap()
+        setupConfigs = emptyList()
+        tuningDocuments = emptyList()
+        setupRecommendationByCar = emptyMap()
+        selectedConfigIdByCar = emptyMap()
+        activeConfigIdByCar = emptyMap()
+        selectedCarId = null
+        showAddCar = false
+        showAddConfig = false
+        showAddDocument = false
+        showCreateMenu = false
+    }
+
+    fun completeLocalAccountLogin(
+        account: LocalAccount,
+        message: String,
+    ) {
+        activeLocalAccount = account
+        localAccounts = localAccountStore.accounts()
+        appUnlocked = true
+        biometricPromptRequested = false
+        accountMessage = message
+    }
+
+    fun submitLocalAccount(
+        mode: LocalAccountDialogMode,
+        email: String,
+        password: String,
+    ) {
+        val result = when (mode) {
+            LocalAccountDialogMode.LOGIN ->
+                localAccountStore.authenticate(email = email, password = password)
+            LocalAccountDialogMode.SIGN_UP ->
+                localAccountStore.createAccount(email = email, password = password)
+        }
+        val account = result.account
+
+        if (account == null) {
+            localAccountDialogMessage = result.errorMessage
+            return
+        }
+
+        localAccountDialogMode = null
+        localAccountDialogMessage = null
+        completeLocalAccountLogin(
+            account = account,
+            message = if (mode == LocalAccountDialogMode.LOGIN) {
+                "Logged in as ${account.email}."
+            } else {
+                "Created local account ${account.email}."
+            }
+        )
+    }
+
+    fun logOffLocalAccount() {
+        localAccountStore.logOff()
+        activeLocalAccount = null
+        appUnlocked = false
+        biometricPromptRequested = false
+        localAccountDialogMode = null
+        localAccountDialogMessage = null
+        accountMessage = "Logged off."
+        clearSetupSession()
+    }
+
     fun requestUnlock(
         title: String = "Unlock Suslog",
         subtitle: String = "Use device security to continue.",
@@ -179,6 +269,27 @@ fun SuslogApp(
                 accountMessage = error
             }
         )
+    }
+
+    LaunchedEffect(
+        appUnlocked,
+        appLockEnabled,
+        activeLocalAccount?.id,
+        biometricStatus,
+    ) {
+        val account = activeLocalAccount
+        if (!appUnlocked &&
+            appLockEnabled &&
+            account != null &&
+            biometricStatus == BiometricAuthStatus.AVAILABLE &&
+            !biometricPromptRequested
+        ) {
+            biometricPromptRequested = true
+            requestUnlock(
+                title = "Unlock SusLog",
+                subtitle = "Verify as ${account.email}."
+            )
+        }
     }
 
     fun requestAppLockChange(enabled: Boolean) {
@@ -200,9 +311,15 @@ fun SuslogApp(
         )
     }
 
-    LaunchedEffect(repository) {
+    LaunchedEffect(repository, activeLocalAccount?.id) {
+        val account = activeLocalAccount
+        if (account == null) {
+            clearSetupSession()
+            return@LaunchedEffect
+        }
+
         val persisted = withContext(Dispatchers.IO) {
-            repository.load()
+            repository.load(account.id)
         }
 
         cars = persisted.cars
@@ -268,8 +385,9 @@ fun SuslogApp(
                     },
                     onAddCar = { car ->
                         scope.launch {
+                            val account = activeLocalAccount ?: return@launch
                             val stateMachine = withContext(Dispatchers.IO) {
-                                repository.addCar(car)
+                                repository.addCar(car = car, localUserId = account.id)
                             }
                             val currentSetup = requireNotNull(stateMachine.currentState).setup
 
@@ -282,8 +400,12 @@ fun SuslogApp(
                     },
                     onUpdateCar = { updatedCar ->
                         scope.launch {
+                            val account = activeLocalAccount ?: return@launch
                             withContext(Dispatchers.IO) {
-                                repository.updateCar(updatedCar)
+                                repository.updateCar(
+                                    car = updatedCar,
+                                    localUserId = account.id
+                                )
                             }
 
                             cars = cars.map { car ->
@@ -471,12 +593,15 @@ fun SuslogApp(
                 AppDestination.SETTINGS -> SettingsScreen(
                     appLockEnabled = appLockEnabled,
                     biometricStatus = biometricStatus,
+                    activeAccountEmail = activeLocalAccount?.email,
+                    carCount = cars.size,
+                    setupConfigCount = setupConfigs.size,
                     accountMessage = accountMessage,
                     dataMessage = dataMessage,
                     setupDefaults = setupDefaults,
                     tuningPreferences = tuningPreferences,
                     onAppLockChange = ::requestAppLockChange,
-                    onUnlockNow = { requestUnlock() },
+                    onLogOff = ::logOffLocalAccount,
                     onExportData = {
                         pendingExportJson = SuslogExportJson.build(
                             cars = cars,
@@ -491,23 +616,12 @@ fun SuslogApp(
                     onClearLocalData = {
                         dataMessage = "Clearing local data..."
                         scope.launch {
+                            val account = activeLocalAccount ?: return@launch
                             withContext(Dispatchers.IO) {
-                                repository.clearLocalData()
+                                repository.clearLocalData(account.id)
                             }
 
-                            cars = emptyList()
-                            setupStateMachinesByCar = emptyMap()
-                            draftSetupByCar = emptyMap()
-                            setupConfigs = emptyList()
-                            tuningDocuments = emptyList()
-                            setupRecommendationByCar = emptyMap()
-                            selectedConfigIdByCar = emptyMap()
-                            activeConfigIdByCar = emptyMap()
-                            selectedCarId = null
-                            showAddCar = false
-                            showAddConfig = false
-                            showAddDocument = false
-                            showCreateMenu = false
+                            clearSetupSession()
                             dataMessage = "Local data cleared."
                         }
                     },
@@ -606,25 +720,71 @@ fun SuslogApp(
 
             if (!appUnlocked) {
                 AppLockOverlay(
+                    activeAccountEmail = activeLocalAccount?.email,
+                    hasLocalAccounts = localAccounts.isNotEmpty(),
+                    appLockEnabled = appLockEnabled,
                     biometricStatus = biometricStatus,
                     accountMessage = accountMessage,
-                    onUnlock = { requestUnlock() }
+                    onRetryBiometric = {
+                        activeLocalAccount?.let { account ->
+                            requestUnlock(
+                                title = "Unlock SusLog",
+                                subtitle = "Verify as ${account.email}."
+                            )
+                        }
+                    },
+                    onLoginClick = {
+                        localAccountDialogMode = LocalAccountDialogMode.LOGIN
+                        localAccountDialogMessage = null
+                        accountMessage = null
+                    },
+                    onSignUpClick = {
+                        localAccountDialogMode = LocalAccountDialogMode.SIGN_UP
+                        localAccountDialogMessage = null
+                        accountMessage = null
+                    }
                 )
             }
         }
+    }
+
+    localAccountDialogMode?.let { mode ->
+        LocalAccountDialog(
+            mode = mode,
+            initialEmail = activeLocalAccount?.email.orEmpty(),
+            errorMessage = localAccountDialogMessage,
+            onDismiss = { localAccountDialogMode = null },
+            onSubmit = { email, password ->
+                submitLocalAccount(
+                    mode = mode,
+                    email = email,
+                    password = password
+                )
+            }
+        )
     }
 }
 
 @Composable
 private fun AppLockOverlay(
+    activeAccountEmail: String?,
+    hasLocalAccounts: Boolean,
+    appLockEnabled: Boolean,
     biometricStatus: BiometricAuthStatus,
     accountMessage: String?,
-    onUnlock: () -> Unit,
+    onRetryBiometric: () -> Unit,
+    onLoginClick: () -> Unit,
+    onSignUpClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val canRetryBiometric =
+        appLockEnabled &&
+            activeAccountEmail != null &&
+            biometricStatus == BiometricAuthStatus.AVAILABLE
+
     Surface(
         modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        color = Color.White
     ) {
         Column(
             modifier = Modifier
@@ -633,18 +793,34 @@ private fun AppLockOverlay(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_logo),
+                contentDescription = "SusLog",
+                modifier = Modifier
+                    .size(116.dp)
+                    .clickable(enabled = canRetryBiometric) {
+                        onRetryBiometric()
+                    }
+            )
             Text(
-                text = "Suslog Locked",
-                style = MaterialTheme.typography.headlineSmall,
+                text = "SusLog",
+                modifier = Modifier.padding(top = 12.dp),
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = if (biometricStatus == BiometricAuthStatus.AVAILABLE) {
-                    "Use device security to unlock your setup data."
-                } else {
-                    "Device security is unavailable on this device."
+                text = when {
+                    activeAccountEmail != null && appLockEnabled ->
+                        "Tap the logo to verify as $activeAccountEmail."
+                    activeAccountEmail != null ->
+                        "Login to continue as $activeAccountEmail."
+                    hasLocalAccounts ->
+                        "Login to your local account."
+                    else ->
+                        "Create a local account on this device."
                 },
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 10.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -657,17 +833,100 @@ private fun AppLockOverlay(
                 )
             }
             Button(
-                onClick = onUnlock,
-                enabled = biometricStatus == BiometricAuthStatus.AVAILABLE,
+                onClick = onLoginClick,
+                enabled = hasLocalAccounts,
                 modifier = Modifier
-                    .padding(top = 20.dp)
+                    .padding(top = 28.dp)
                     .fillMaxWidth()
                     .widthIn(max = 320.dp)
             ) {
-                Text("Unlock")
+                Text("Login")
+            }
+            OutlinedButton(
+                onClick = onSignUpClick,
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .fillMaxWidth()
+                    .widthIn(max = 320.dp)
+            ) {
+                Text("Sign Up")
             }
         }
     }
+}
+
+@Composable
+private fun LocalAccountDialog(
+    mode: LocalAccountDialogMode,
+    initialEmail: String,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onSubmit: (String, String) -> Unit,
+) {
+    var email by remember(mode, initialEmail) { mutableStateOf(initialEmail) }
+    var password by remember(mode) { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = when (mode) {
+                    LocalAccountDialogMode.LOGIN -> "Login"
+                    LocalAccountDialogMode.SIGN_UP -> "Sign Up"
+                }
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                errorMessage?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSubmit(email, password) }
+            ) {
+                Text(
+                    text = when (mode) {
+                        LocalAccountDialogMode.LOGIN -> "Login"
+                        LocalAccountDialogMode.SIGN_UP -> "Sign Up"
+                    }
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+private enum class LocalAccountDialogMode {
+    LOGIN,
+    SIGN_UP,
 }
 
 @Composable

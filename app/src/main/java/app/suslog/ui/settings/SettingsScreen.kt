@@ -50,12 +50,15 @@ import app.suslog.ui.theme.SuslogTheme
 fun SettingsScreen(
     appLockEnabled: Boolean,
     biometricStatus: BiometricAuthStatus,
+    activeAccountEmail: String?,
+    carCount: Int,
+    setupConfigCount: Int,
     accountMessage: String?,
     dataMessage: String?,
     setupDefaults: SetupDefaults,
     tuningPreferences: TuningPreferences,
     onAppLockChange: (Boolean) -> Unit,
-    onUnlockNow: () -> Unit,
+    onLogOff: () -> Unit,
     onExportData: () -> Unit,
     onClearLocalData: () -> Unit,
     onDefaultAxleLockChange: (Boolean) -> Unit,
@@ -91,11 +94,14 @@ fun SettingsScreen(
         }
 
         SettingsSection(title = "Account") {
-            AccountLockRow(
-                enabled = appLockEnabled,
+            AccountRow(
+                appLockEnabled = appLockEnabled,
                 biometricStatus = biometricStatus,
+                activeAccountEmail = activeAccountEmail,
+                carCount = carCount,
+                setupConfigCount = setupConfigCount,
                 onAppLockChange = onAppLockChange,
-                onUnlockNow = onUnlockNow
+                onLogOff = onLogOff
             )
             accountMessage?.let {
                 Text(
@@ -510,14 +516,19 @@ private fun CloudTransferDialog(
 }
 
 @Composable
-private fun AccountLockRow(
-    enabled: Boolean,
+private fun AccountRow(
+    appLockEnabled: Boolean,
     biometricStatus: BiometricAuthStatus,
+    activeAccountEmail: String?,
+    carCount: Int,
+    setupConfigCount: Int,
     onAppLockChange: (Boolean) -> Unit,
-    onUnlockNow: () -> Unit,
+    onLogOff: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val available = biometricStatus == BiometricAuthStatus.AVAILABLE
+    val accountText = activeAccountEmail ?: "Not logged in"
+    val summaryText = "${countLabel(carCount, "car")} · ${countLabel(setupConfigCount, "config")}"
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -539,7 +550,7 @@ private fun AccountLockRow(
                 )
                 Text(
                     text = accountStatusText(
-                        enabled = enabled,
+                        enabled = appLockEnabled,
                         biometricStatus = biometricStatus
                     ),
                     style = MaterialTheme.typography.bodySmall,
@@ -547,33 +558,51 @@ private fun AccountLockRow(
                 )
             }
             Switch(
-                checked = enabled,
+                checked = appLockEnabled,
                 onCheckedChange = onAppLockChange,
-                enabled = available || enabled
+                enabled = available || appLockEnabled
             )
         }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(
-                onClick = onUnlockNow,
-                enabled = available,
+            Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Verify Now")
+                Text(
+                    text = "Current User",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = accountText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = summaryText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             OutlinedButton(
-                onClick = { onAppLockChange(false) },
-                enabled = enabled,
-                modifier = Modifier.weight(1f)
+                onClick = onLogOff,
+                enabled = activeAccountEmail != null
             ) {
-                Text("Turn Off")
+                Text("Log Off")
             }
         }
     }
 }
+
+private fun countLabel(
+    count: Int,
+    singular: String,
+): String =
+    "$count ${if (count == 1) singular else "${singular}s"}"
 
 @Composable
 private fun DisabledSettingRow(
@@ -633,6 +662,9 @@ private fun SettingsScreenPreview() {
         SettingsScreen(
             appLockEnabled = true,
             biometricStatus = BiometricAuthStatus.AVAILABLE,
+            activeAccountEmail = "driver@suslog.local",
+            carCount = 2,
+            setupConfigCount = 5,
             accountMessage = "Last verification succeeded.",
             dataMessage = "Export complete.",
             setupDefaults = SetupDefaults(
@@ -647,7 +679,7 @@ private fun SettingsScreenPreview() {
                 showSetupDebugInfo = false
             ),
             onAppLockChange = {},
-            onUnlockNow = {},
+            onLogOff = {},
             onExportData = {},
             onClearLocalData = {},
             onDefaultAxleLockChange = {},

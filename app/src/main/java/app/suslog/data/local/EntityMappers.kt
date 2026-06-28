@@ -11,9 +11,10 @@ import app.suslog.domain.suspension.StiffSide
 import app.suslog.domain.suspension.SuspensionType
 import app.suslog.domain.tuning.TuningDocument
 
-fun CarProfile.toEntity(): CarEntity =
+fun CarProfile.toEntity(localUserId: String): CarEntity =
     CarEntity(
         id = id,
+        localUserId = localUserId,
         name = name,
         suspensionType = suspensionType.name
     )

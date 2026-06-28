@@ -16,7 +16,7 @@ import androidx.room.RoomDatabase
         SetupConfigStateClickEntity::class,
         TuningDocumentEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class SuslogDatabase : RoomDatabase() {
@@ -34,7 +34,6 @@ abstract class SuslogDatabase : RoomDatabase() {
                     "suslog.db"
                 )
                     .fallbackToDestructiveMigration(dropAllTables = true)
-                    .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .build()
                     .also { instance = it }
             }

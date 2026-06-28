@@ -6,6 +6,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
 import app.suslog.settings.AppSettingsStore
 import app.suslog.settings.BiometricAuth
+import app.suslog.settings.LocalAccountStore
 import app.suslog.ui.SuslogApp
 import app.suslog.ui.theme.SuslogTheme
 
@@ -16,12 +17,14 @@ class MainActivity : FragmentActivity() {
 
         val settingsStore = AppSettingsStore(this)
         val biometricAuth = BiometricAuth(this)
+        val localAccountStore = LocalAccountStore(this)
 
         setContent {
             SuslogTheme {
                 SuslogApp(
                     settingsStore = settingsStore,
-                    biometricAuth = biometricAuth
+                    biometricAuth = biometricAuth,
+                    localAccountStore = localAccountStore
                 )
             }
         }

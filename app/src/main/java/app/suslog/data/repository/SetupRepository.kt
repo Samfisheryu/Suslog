@@ -23,8 +23,8 @@ data class PersistedSetupData(
 class SetupRepository(
     private val dao: SuslogDao,
 ) {
-    suspend fun load(): PersistedSetupData {
-        val cars = dao.getCarsWithAdjusters().map { it.toDomain() }
+    suspend fun load(localUserId: String): PersistedSetupData {
+        val cars = dao.getCarsWithAdjusters(localUserId).map { it.toDomain() }
         val machines = cars.associate { car ->
             car.id to loadStateMachine(car)
         }
@@ -32,17 +32,20 @@ class SetupRepository(
         return PersistedSetupData(
             cars = cars,
             setupStateMachinesByCar = machines,
-            setupConfigs = loadSetupConfigs(),
-            tuningDocuments = dao.getTuningDocuments().map { it.toDomain() }
+            setupConfigs = loadSetupConfigs(localUserId),
+            tuningDocuments = dao.getTuningDocuments(localUserId).map { it.toDomain() }
         )
     }
 
-    suspend fun addCar(car: CarProfile): SetupStateMachine {
+    suspend fun addCar(
+        car: CarProfile,
+        localUserId: String,
+    ): SetupStateMachine {
         val stateMachine = car.initialSetupStateMachine()
         val initialState = requireNotNull(stateMachine.currentState)
 
         dao.insertCarWithInitialState(
-            car = car.toEntity(),
+            car = car.toEntity(localUserId),
             adjusters = car.toAdjusterEntities(),
             initialState = initialState
         )
@@ -50,9 +53,12 @@ class SetupRepository(
         return stateMachine
     }
 
-    suspend fun updateCar(car: CarProfile) {
+    suspend fun updateCar(
+        car: CarProfile,
+        localUserId: String,
+    ) {
         dao.updateCarWithAdjusters(
-            car = car.toEntity(),
+            car = car.toEntity(localUserId),
             adjusters = car.toAdjusterEntities()
         )
     }
@@ -80,16 +86,16 @@ class SetupRepository(
         dao.deleteSetupConfig(configId)
     }
 
-    suspend fun clearLocalData() {
-        dao.deleteAllCars()
+    suspend fun clearLocalData(localUserId: String) {
+        dao.deleteCarsForLocalUser(localUserId)
     }
 
     suspend fun addTuningDocument(document: TuningDocument) {
         dao.insertTuningDocument(document.toEntity())
     }
 
-    private suspend fun loadSetupConfigs(): List<SetupConfig> {
-        val configEntities = dao.getSetupConfigs()
+    private suspend fun loadSetupConfigs(localUserId: String): List<SetupConfig> {
+        val configEntities = dao.getSetupConfigs(localUserId)
         if (configEntities.isEmpty()) {
             return emptyList()
         }

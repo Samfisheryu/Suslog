@@ -77,6 +77,10 @@ class SetupRepository(
         return config.withCurrentStateId(stateId)
     }
 
+    suspend fun deleteSetupConfig(configId: String) {
+        dao.deleteSetupConfig(configId)
+    }
+
     suspend fun addTuningDocument(document: TuningDocument) {
         dao.insertTuningDocument(document.toEntity())
     }

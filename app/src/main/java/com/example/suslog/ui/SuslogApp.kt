@@ -372,6 +372,26 @@ fun SuslogApp(
                                 selectedConfigIdByCar + (persistedConfig.carId to persistedConfig.id)
                         }
                     },
+                    onDeleteConfig = { config ->
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                repository.deleteSetupConfig(config.id)
+                            }
+
+                            setupConfigs = setupConfigs.filterNot { it.id == config.id }
+                            if (selectedConfigIdByCar[config.carId] == config.id) {
+                                selectedConfigIdByCar = selectedConfigIdByCar + (config.carId to null)
+                            }
+                            if (activeConfigIdByCar[config.carId] == config.id) {
+                                activeConfigIdByCar = activeConfigIdByCar + (config.carId to null)
+                            }
+                            setupRecommendationByCar[config.carId]?.let { recommendation ->
+                                if (recommendation.configId == config.id) {
+                                    setupRecommendationByCar = setupRecommendationByCar - config.carId
+                                }
+                            }
+                        }
+                    },
                     modifier = Modifier.padding(innerPadding)
                 )
 

@@ -1,7 +1,6 @@
 package com.example.suslog.ui.config
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -69,9 +69,11 @@ fun ConfigScreen(
     onSelectCar: (String) -> Unit,
     onAddConfig: (SetupConfig) -> Unit,
     onUpdateConfig: (SetupConfig) -> Unit,
+    onDeleteConfig: (SetupConfig) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var editingConfigId by remember { mutableStateOf<String?>(null) }
+    var pendingDeleteConfig by remember { mutableStateOf<SetupConfig?>(null) }
     val selectedCar = cars.firstOrNull { it.id == selectedCarId } ?: cars.firstOrNull()
     val carConfigs = selectedCar?.let { car ->
         setupConfigs.filter { it.carId == car.id }
@@ -136,9 +138,35 @@ fun ConfigScreen(
                 car = selectedCar,
                 setupConfigs = carConfigs,
                 onCreateConfig = { onShowAddConfigChange(true) },
-                onEditConfig = { editingConfigId = it.id }
+                onEditConfig = { editingConfigId = it.id },
+                onDeleteConfig = { pendingDeleteConfig = it }
             )
         }
+    }
+
+    pendingDeleteConfig?.let { config ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteConfig = null },
+            title = { Text("Delete Config") },
+            text = {
+                Text("Delete \"${config.name}\"? This will remove its setup history from this device.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteConfig(config)
+                        pendingDeleteConfig = null
+                    }
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { pendingDeleteConfig = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -188,6 +216,7 @@ private fun ConfigSummaryList(
     setupConfigs: List<SetupConfig>,
     onCreateConfig: () -> Unit,
     onEditConfig: (SetupConfig) -> Unit,
+    onDeleteConfig: (SetupConfig) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (setupConfigs.isEmpty()) {
@@ -227,7 +256,8 @@ private fun ConfigSummaryList(
             SetupConfigSummaryCard(
                 car = car,
                 config = config,
-                onClick = { onEditConfig(config) }
+                onEdit = { onEditConfig(config) },
+                onDelete = { onDeleteConfig(config) }
             )
         }
     }
@@ -237,13 +267,12 @@ private fun ConfigSummaryList(
 private fun SetupConfigSummaryCard(
     car: CarProfile,
     config: SetupConfig,
-    onClick: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
@@ -274,12 +303,32 @@ private fun SetupConfigSummaryCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Text(
-                    text = "Edit",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = onEdit,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "Edit",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    TextButton(
+                        onClick = onDelete,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "Delete",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
 
             if (config.hasFeedback) {
@@ -793,7 +842,8 @@ private fun ConfigScreenPreview() {
             onShowAddConfigChange = {},
             onSelectCar = {},
             onAddConfig = {},
-            onUpdateConfig = {}
+            onUpdateConfig = {},
+            onDeleteConfig = {}
         )
     }
 }

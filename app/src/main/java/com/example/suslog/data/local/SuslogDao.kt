@@ -125,6 +125,9 @@ interface SuslogDao {
     @Query("DELETE FROM setup_config_clicks WHERE configId = :configId")
     suspend fun deleteSetupConfigClicks(configId: String)
 
+    @Query("DELETE FROM setup_configs WHERE id = :configId")
+    suspend fun deleteSetupConfig(configId: String)
+
     @Transaction
     suspend fun insertCarWithInitialState(
         car: CarEntity,

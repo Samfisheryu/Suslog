@@ -93,6 +93,22 @@ interface SuslogDao {
     @Query("SELECT * FROM ai_conversations WHERE configId = :configId ORDER BY updatedAtMillis DESC")
     suspend fun getAiConversationsForConfig(configId: String): List<AiConversationEntity>
 
+    @Query(
+        """
+        SELECT * FROM ai_conversations
+        WHERE localUserId = :localUserId
+            AND configId = :configId
+            AND provider = :provider
+        ORDER BY updatedAtMillis DESC
+        LIMIT 1
+        """
+    )
+    suspend fun getLatestAiConversation(
+        localUserId: String,
+        configId: String,
+        provider: String,
+    ): AiConversationEntity?
+
     @Query("SELECT * FROM ai_messages WHERE conversationId = :conversationId ORDER BY seq ASC")
     suspend fun getAiMessages(conversationId: String): List<AiMessageEntity>
 
@@ -152,6 +168,28 @@ interface SuslogDao {
         outputTokenCount: Int?,
     )
 
+    @Query("UPDATE ai_conversations SET updatedAtMillis = :updatedAtMillis WHERE id = :conversationId")
+    suspend fun touchAiConversation(
+        conversationId: String,
+        updatedAtMillis: Long,
+    )
+
+    @Query(
+        """
+        UPDATE ai_conversations
+        SET lastTurnRef = :lastTurnRef,
+            lastSentStateCount = :lastSentStateCount,
+            updatedAtMillis = :updatedAtMillis
+        WHERE id = :conversationId
+        """
+    )
+    suspend fun updateAiConversationLastTurnRef(
+        conversationId: String,
+        lastTurnRef: String?,
+        lastSentStateCount: Int,
+        updatedAtMillis: Long,
+    )
+
     @Query(
         """
         UPDATE setup_config_states
@@ -208,6 +246,12 @@ interface SuslogDao {
 
     @Query("DELETE FROM cars WHERE localUserId = :localUserId")
     suspend fun deleteCarsForLocalUser(localUserId: String)
+
+    @Query("UPDATE cars SET localUserId = :localUserId WHERE localUserId = :legacyLocalUserId")
+    suspend fun adoptLegacyCars(
+        localUserId: String,
+        legacyLocalUserId: String,
+    )
 
     @Transaction
     suspend fun insertTuningDocumentWithContent(document: TuningDocument) {

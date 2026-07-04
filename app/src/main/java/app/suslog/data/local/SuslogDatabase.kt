@@ -31,6 +31,17 @@ abstract class SuslogDatabase : RoomDatabase() {
         @Volatile
         private var instance: SuslogDatabase? = null
 
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    ALTER TABLE `cars`
+                    ADD COLUMN `localUserId` TEXT NOT NULL DEFAULT '$LEGACY_LOCAL_USER_ID'
+                    """.trimIndent()
+                )
+            }
+        }
+
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -138,9 +149,11 @@ abstract class SuslogDatabase : RoomDatabase() {
                     SuslogDatabase::class.java,
                     "suslog.db"
                 )
-                    .addMigrations(MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }
+
+        const val LEGACY_LOCAL_USER_ID = "__legacy_local_user__"
     }
 }

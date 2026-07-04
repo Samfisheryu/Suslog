@@ -559,6 +559,7 @@ fun SuslogApp(
                 AppDestination.TUNING -> TuningScreen(
                     cars = cars,
                     selectedCarId = selectedCarId,
+                    localUserId = activeLocalAccount?.id,
                     tuningDocuments = tuningDocuments,
                     setupConfigs = setupConfigs,
                     activeConfigId = selectedCarId?.let { activeConfigIdByCar[it] },
@@ -587,12 +588,21 @@ fun SuslogApp(
                         selectedConfigIdByCar = selectedConfigIdByCar + (car.id to config.id)
                         currentDestination = AppDestination.SETUP
                     },
+                    onApplyAiRecommendation = { recommendation ->
+                        setupRecommendationByCar =
+                            setupRecommendationByCar + (recommendation.carId to recommendation)
+                        selectedCarId = recommendation.carId
+                        selectedConfigIdByCar =
+                            selectedConfigIdByCar + (recommendation.carId to recommendation.configId)
+                        currentDestination = AppDestination.SETUP
+                    },
                     modifier = Modifier.padding(innerPadding)
                 )
 
                 AppDestination.SETTINGS -> SettingsScreen(
                     appLockEnabled = appLockEnabled,
                     biometricStatus = biometricStatus,
+                    activeAccountId = activeLocalAccount?.id,
                     activeAccountEmail = activeLocalAccount?.email,
                     carCount = cars.size,
                     setupConfigCount = setupConfigs.size,

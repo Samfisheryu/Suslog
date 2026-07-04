@@ -41,6 +41,7 @@ import app.suslog.domain.suspension.StiffSide
 import app.suslog.domain.suspension.SuspensionType
 import app.suslog.domain.tuning.TuningDocument
 import app.suslog.ui.common.FitText
+import app.suslog.ui.setup.SetupRecommendation
 import app.suslog.ui.theme.SuslogTheme
 import java.util.UUID
 
@@ -55,6 +56,7 @@ private enum class TuningSection(
 fun TuningScreen(
     cars: List<CarProfile>,
     selectedCarId: String?,
+    localUserId: String?,
     tuningDocuments: List<TuningDocument>,
     setupConfigs: List<SetupConfig>,
     activeConfigId: String?,
@@ -63,6 +65,7 @@ fun TuningScreen(
     onSelectCar: (String) -> Unit,
     onAddDocument: (TuningDocument) -> Unit,
     onApplyConfigState: (CarProfile, SetupConfig, Int, SetupConfigState) -> Unit,
+    onApplyAiRecommendation: (SetupRecommendation) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var selectedSection by rememberSaveable { mutableStateOf(TuningSection.DOCS) }
@@ -102,11 +105,13 @@ fun TuningScreen(
             car = selectedCar,
             config = openedConfig,
             userTuningDocuments = carDocuments,
+            localUserId = localUserId,
             isActiveConfig = openedConfig.id == activeConfigId,
             onBack = { openedConfigId = null },
             onApplyState = { stateIndex, state ->
                 onApplyConfigState(selectedCar, openedConfig, stateIndex, state)
             },
+            onApplyAiRecommendation = onApplyAiRecommendation,
             modifier = modifier
         )
         return
@@ -441,6 +446,7 @@ private fun TuningScreenPreview() {
         TuningScreen(
             cars = listOf(car),
             selectedCarId = car.id,
+            localUserId = "preview-account",
             tuningDocuments = listOf(document),
             setupConfigs = listOf(config),
             activeConfigId = null,
@@ -448,7 +454,8 @@ private fun TuningScreenPreview() {
             onShowAddDocumentChange = {},
             onSelectCar = {},
             onAddDocument = {},
-            onApplyConfigState = { _, _, _, _ -> }
+            onApplyConfigState = { _, _, _, _ -> },
+            onApplyAiRecommendation = {}
         )
     }
 }

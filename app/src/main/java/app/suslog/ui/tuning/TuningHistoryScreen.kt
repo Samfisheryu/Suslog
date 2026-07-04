@@ -23,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,7 +48,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.suslog.data.ai.AiConversationRepository
 import app.suslog.data.ai.AssetBuiltInTuningDocumentRepository
+import app.suslog.data.ai.TuningAiStructuredRecommendation
 import app.suslog.domain.car.CarProfile
 import app.suslog.domain.setup.SetupConfig
 import app.suslog.domain.setup.SetupConfigState
@@ -67,10 +68,13 @@ import app.suslog.domain.tuning.SetupChangeType
 import app.suslog.domain.tuning.TuningDocument
 import app.suslog.domain.tuning.TuningRecommendation
 import app.suslog.domain.tuning.buildTuningRecommendation
-import app.suslog.domain.tuning.ai.TuningAiContext
+import app.suslog.data.ai.AiCredentialStore
+import app.suslog.data.ai.OpenAiTuningAiClient
+import app.suslog.data.local.SuslogDatabase
+import app.suslog.domain.tuning.ai.TuningAiApply
 import app.suslog.domain.tuning.ai.TuningAiContextBuilder
+import app.suslog.ui.setup.SetupRecommendation
 import app.suslog.domain.tuning.ai.TuningAiReferenceDocument
-import app.suslog.domain.tuning.ai.TuningAiReferenceDocumentSource
 import app.suslog.domain.tuning.summarizeSetupChange
 import app.suslog.ui.common.DashedRule
 import app.suslog.ui.common.FitText
@@ -90,9 +94,11 @@ fun TuningHistoryScreen(
     car: CarProfile,
     config: SetupConfig,
     userTuningDocuments: List<TuningDocument>,
+    localUserId: String?,
     isActiveConfig: Boolean,
     onBack: () -> Unit,
     onApplyState: (Int, SetupConfigState) -> Unit,
+    onApplyAiRecommendation: (SetupRecommendation) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -134,8 +140,38 @@ fun TuningHistoryScreen(
         }
     }
 
+    val credentials = remember(localUserId) { AiCredentialStore(context, localUserId) }
+    val aiClient = remember { OpenAiTuningAiClient() }
+    val aiConversationRepository = remember {
+        AiConversationRepository(SuslogDatabase.getInstance(context).suslogDao())
+    }
+    val aiChat = rememberTuningAiChatController(
+        client = aiClient,
+        credentials = credentials,
+        repository = aiConversationRepository
+    )
+    var showAiSheet by remember(config.id) { mutableStateOf(false) }
+    val aiQuickIssues = listOf(
+        "Entry understeer", "Mid understeer", "Exit oversteer",
+        "Too nervous", "Too lazy", "Poor bump compliance"
+    )
+    val aiContextSummary =
+        "${aiContext.totalStateCount} runs · ${aiContext.referenceDocuments.size} docs · S${aiContext.selectedStateIndex + 1}"
+
+    LaunchedEffect(localUserId, config.id) {
+        if (localUserId == null) {
+            aiChat.clearThread()
+        } else {
+            aiChat.loadThread(
+                localUserId = localUserId,
+                configId = config.id
+            )
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
@@ -193,12 +229,19 @@ fun TuningHistoryScreen(
 
         TelemetryCard(
             title = "AI Tuning Assistant",
-            meta = if (referenceDocuments.isEmpty()) "LOADING DOCS" else "CONTEXT READY"
+            meta = if (referenceDocuments.isEmpty()) "LOADING DOCS" else "READY"
         ) {
-            TuningAiPanel(
-                aiContext = aiContext,
-                docsLoaded = referenceDocuments.isNotEmpty()
+            Text(
+                text = "Chat about this config. The assistant reads your runs, the local model, and your tuning guides, and can hand a next test straight to Setup.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Button(
+                onClick = { showAiSheet = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (credentials.isConnected) "Ask the tuning assistant" else "Set up AI, then ask")
+            }
         }
 
         if (hasAnyFeedback) {
@@ -232,95 +275,78 @@ fun TuningHistoryScreen(
             )
         }
     }
-}
 
-@Composable
-private fun TuningAiPanel(
-    aiContext: TuningAiContext,
-    docsLoaded: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    var issueText by rememberSaveable(aiContext.config.id) { mutableStateOf("") }
-    val quickIssues = listOf(
-        "Entry understeer",
-        "Mid-corner understeer",
-        "Exit oversteer",
-        "Too nervous",
-        "Too lazy",
-        "Poor bump compliance"
-    )
-    val builtInDocumentCount = aiContext.referenceDocuments.count {
-        it.source == TuningAiReferenceDocumentSource.BUILT_IN
-    }
-    val userDocumentCount = aiContext.referenceDocuments.size - builtInDocumentCount
-    val documentChars = aiContext.referenceDocuments.sumOf { it.content.length }
-    val contextSummary = buildString {
-        append("${aiContext.totalStateCount} states")
-        append(" · $builtInDocumentCount built-in docs")
-        if (userDocumentCount > 0) {
-            append(" · $userDocumentCount user docs")
-        }
-        if (documentChars > 0) {
-            append(" · ${(documentChars / 1000.0).roundToInt()}k doc chars")
-        }
-        append(" · S${aiContext.selectedStateIndex + 1} selected")
-    }
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = "Describe what the car is doing. The assistant will use this config's setup history, the local tuning model, and the built-in documents as context.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        quickIssues.chunked(2).forEach { rowIssues ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                rowIssues.forEach { issue ->
-                    OutlinedButton(
-                        onClick = { issueText = issue },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
-                    ) {
-                        FitText(text = issue)
+        TuningAiSheet(
+            visible = showAiSheet,
+            contextSummary = aiContextSummary,
+            connected = credentials.isConnected,
+            messages = aiChat.messages,
+            isThinking = aiChat.isThinking,
+            isLoading = aiChat.isLoading,
+            error = aiChat.error,
+            quickIssues = aiQuickIssues,
+            normalizeRecommendation = { recommendation ->
+                normalizeAiRecommendation(car, recommendation)
+            },
+            onSend = { text ->
+                aiChat.send(
+                    userText = text,
+                    context = aiContext,
+                    adjusterLabels = car.adjusters.map { it.label },
+                    localUserId = localUserId,
+                    carId = car.id,
+                    configId = config.id,
+                    configName = config.name
+                )
+            },
+            onApply = { recommendation ->
+                val nextTest = recommendation.nextTest
+                if (nextTest != null) {
+                    val baseSetup = config.currentState?.setup ?: selectedState?.setup ?: emptyMap()
+                    val target = TuningAiApply.buildTargetSetup(
+                        car = car,
+                        baseSetup = baseSetup,
+                        axleName = nextTest.axle,
+                        adjusterLabel = nextTest.adjusterLabel,
+                        targetClick = nextTest.targetClick
+                    )
+                    if (target != null) {
+                        showAiSheet = false
+                        onApplyAiRecommendation(
+                            SetupRecommendation(
+                                carId = car.id,
+                                configId = config.id,
+                                configName = config.name,
+                                stateLabel = "AI · ${nextTest.adjusterLabel} ${nextTest.targetClick}",
+                                setup = target
+                            )
+                        )
                     }
                 }
-                if (rowIssues.size == 1) {
-                    Box(modifier = Modifier.weight(1f))
-                }
-            }
-        }
-        OutlinedTextField(
-            value = issueText,
-            onValueChange = { issueText = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Driver issue") },
-            minLines = 3,
-            placeholder = {
-                Text("Example: entry understeer, then exit feels loose on throttle.")
-            }
-        )
-        Text(
-            text = if (docsLoaded) {
-                "Context ready: $contextSummary"
-            } else {
-                "Loading tuning documents..."
             },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            onDismiss = { showAiSheet = false }
         )
-        Button(
-            onClick = {},
-            enabled = false,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Analyze · AI provider not connected")
-        }
     }
+}
+
+private fun normalizeAiRecommendation(
+    car: CarProfile,
+    recommendation: TuningAiStructuredRecommendation,
+): TuningAiStructuredRecommendation {
+    val nextTest = recommendation.nextTest ?: return recommendation
+    val clamped = TuningAiApply.clampedTargetClick(
+        car = car,
+        adjusterLabel = nextTest.adjusterLabel,
+        targetClick = nextTest.targetClick
+    ) ?: return recommendation.copy(
+        nextTest = null,
+        cautions = recommendation.cautions +
+            "Recommendation ignored because the adjuster is not available on this car."
+    )
+
+    return recommendation.copy(
+        nextTest = nextTest.copy(targetClick = clamped)
+    )
 }
 
 @Composable
@@ -1373,9 +1399,11 @@ private fun TuningHistoryScreenPreview() {
             car = car,
             config = sampleHistoryConfig(car),
             userTuningDocuments = emptyList(),
+            localUserId = "preview-account",
             isActiveConfig = true,
             onBack = {},
-            onApplyState = { _, _ -> }
+            onApplyState = { _, _ -> },
+            onApplyAiRecommendation = {}
         )
     }
 }

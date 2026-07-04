@@ -1,6 +1,7 @@
 package app.suslog.data.repository
 
 import app.suslog.data.local.SuslogDao
+import app.suslog.data.local.SuslogDatabase
 import app.suslog.data.local.setupConfigFromEntities
 import app.suslog.data.local.setupStateFromEntities
 import app.suslog.data.local.toAdjusterEntities
@@ -24,6 +25,11 @@ class SetupRepository(
     private val dao: SuslogDao,
 ) {
     suspend fun load(localUserId: String): PersistedSetupData {
+        dao.adoptLegacyCars(
+            localUserId = localUserId,
+            legacyLocalUserId = SuslogDatabase.LEGACY_LOCAL_USER_ID
+        )
+
         val cars = dao.getCarsWithAdjusters(localUserId).map { it.toDomain() }
         val machines = cars.associate { car ->
             car.id to loadStateMachine(car)

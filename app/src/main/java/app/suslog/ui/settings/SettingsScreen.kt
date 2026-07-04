@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -26,17 +29,23 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.suslog.data.ai.AiCredentialStore
+import app.suslog.data.ai.OpenAiTuningAiClient
 import app.suslog.domain.suspension.StiffSide
 import app.suslog.domain.suspension.SuspensionType
 import app.suslog.settings.BiometricAuthStatus
@@ -45,11 +54,13 @@ import app.suslog.settings.TuningPreferences
 import app.suslog.ui.common.ChoiceButton
 import app.suslog.ui.common.SectionHeader
 import app.suslog.ui.theme.SuslogTheme
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
     appLockEnabled: Boolean,
     biometricStatus: BiometricAuthStatus,
+    activeAccountId: String?,
     activeAccountEmail: String?,
     carCount: Int,
     setupConfigCount: Int,
@@ -161,12 +172,9 @@ fun SettingsScreen(
         }
 
         SettingsSection(title = "AI Connections") {
+            OpenAiConnectionRow(activeAccountId = activeAccountId)
             DisabledSettingRow(
                 title = "Google / Gemini",
-                value = "Not connected"
-            )
-            DisabledSettingRow(
-                title = "OpenAI",
                 value = "Not connected"
             )
         }
@@ -605,6 +613,170 @@ private fun countLabel(
     "$count ${if (count == 1) singular else "${singular}s"}"
 
 @Composable
+private fun OpenAiConnectionRow(
+    activeAccountId: String?,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val credentials = remember(activeAccountId) { AiCredentialStore(context, activeAccountId) }
+    var apiKey by remember(activeAccountId) { mutableStateOf("") }
+    var model by remember(activeAccountId) { mutableStateOf(credentials.model) }
+    var connected by remember(activeAccountId) { mutableStateOf(credentials.isConnected) }
+    val scope = rememberCoroutineScope()
+    val client = remember { OpenAiTuningAiClient() }
+    var models by remember { mutableStateOf<List<String>>(emptyList()) }
+    var loadingModels by remember { mutableStateOf(false) }
+    var modelsError by remember { mutableStateOf<String?>(null) }
+    var modelMenuOpen by remember { mutableStateOf(false) }
+    val enabled = activeAccountId != null
+
+    fun loadModels() {
+        if (!enabled || loadingModels) return
+        loadingModels = true
+        modelsError = null
+        val pendingApiKey = apiKey
+        scope.launch {
+            val key = pendingApiKey.ifBlank { credentials.apiKey }
+            if (key.isBlank()) {
+                modelsError = "Save an OpenAI API key first."
+                loadingModels = false
+                return@launch
+            }
+            client.listChatModels(key)
+                .onSuccess { models = it }
+                .onFailure { modelsError = it.message ?: "Could not load models." }
+            loadingModels = false
+        }
+    }
+
+    LaunchedEffect(connected) {
+        if (connected && models.isEmpty()) loadModels()
+    }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "OpenAI",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (connected) {
+                        "Connected. Your key stays on this device."
+                    } else if (!enabled) {
+                        "Login to a local account first."
+                    } else {
+                        "Bring your own API key."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (connected) {
+                Text(text = "●", color = MaterialTheme.colorScheme.primary)
+            }
+        }
+        OutlinedTextField(
+            value = apiKey,
+            onValueChange = {
+                apiKey = it
+                connected = false
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("API key (sk-…)") },
+            placeholder = {
+                if (connected) {
+                    Text("Saved key")
+                }
+            },
+            enabled = enabled,
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation()
+        )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = {
+                    if (models.isNotEmpty()) modelMenuOpen = true else loadModels()
+                },
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (loadingModels) "Loading models…" else "Model: $model",
+                    modifier = Modifier.weight(1f)
+                )
+                Text(text = if (models.isEmpty()) "Load" else "▾")
+            }
+            DropdownMenu(
+                expanded = modelMenuOpen,
+                onDismissRequest = { modelMenuOpen = false }
+            ) {
+                models.forEach { candidate ->
+                    DropdownMenuItem(
+                        text = { Text(candidate) },
+                        onClick = {
+                            model = candidate
+                            credentials.model = candidate
+                            modelMenuOpen = false
+                        }
+                    )
+                }
+            }
+        }
+        modelsError?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = {
+                    credentials.apiKey = apiKey
+                    credentials.model = model
+                    connected = credentials.isConnected
+                    apiKey = ""
+                },
+                enabled = enabled && apiKey.isNotBlank(),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Save")
+            }
+            OutlinedButton(
+                onClick = {
+                    credentials.clear()
+                    apiKey = ""
+                    model = credentials.model
+                    models = emptyList()
+                    connected = false
+                },
+                enabled = enabled,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Clear")
+            }
+        }
+        Text(
+            text = "When you use the assistant your setup history and messages are sent to OpenAI.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
 private fun DisabledSettingRow(
     title: String,
     value: String,
@@ -662,6 +834,7 @@ private fun SettingsScreenPreview() {
         SettingsScreen(
             appLockEnabled = true,
             biometricStatus = BiometricAuthStatus.AVAILABLE,
+            activeAccountId = "preview-account",
             activeAccountEmail = "driver@suslog.local",
             carCount = 2,
             setupConfigCount = 5,

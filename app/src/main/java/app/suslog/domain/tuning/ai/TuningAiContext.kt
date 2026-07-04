@@ -35,6 +35,18 @@ data class TuningAiContext(
             )
         )
 
+    /** The stable context prefix (reference docs + runtime snapshot),
+     *  without the user's message. Chat history and the new user turn are appended by the client. */
+    fun contextMessages(
+        includeReferenceDocuments: Boolean = true,
+    ): List<TuningAiPromptMessage> =
+        buildList {
+            if (includeReferenceDocuments) {
+                add(TuningAiPromptMessage(role = "user", content = referenceDocumentsToPrompt()))
+            }
+            add(TuningAiPromptMessage(role = "user", content = runtimeContextToPrompt()))
+        }
+
     fun toUserContext(): String =
         buildString {
             appendLine(referenceDocumentsToPrompt())

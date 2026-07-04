@@ -168,10 +168,20 @@ fun TuningDocument.toEntity(): TuningDocumentEntity =
         createdAtMillis = createdAtMillis
     )
 
-fun TuningDocumentEntity.toDomain(): TuningDocument =
+fun TuningDocument.toContentEntity(): TuningDocumentContentEntity =
+    TuningDocumentContentEntity(
+        documentId = id,
+        content = content,
+        updatedAtMillis = createdAtMillis
+    )
+
+fun TuningDocumentEntity.toDomain(
+    content: TuningDocumentContentEntity?,
+): TuningDocument =
     TuningDocument(
         id = id,
         carId = carId,
         name = name,
+        content = content?.content.orEmpty(),
         createdAtMillis = createdAtMillis
     )

@@ -159,3 +159,102 @@ data class TuningDocumentEntity(
     val name: String,
     val createdAtMillis: Long,
 )
+
+@Entity(
+    tableName = "tuning_document_contents",
+    foreignKeys = [
+        ForeignKey(
+            entity = TuningDocumentEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["documentId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("documentId")]
+)
+data class TuningDocumentContentEntity(
+    @PrimaryKey val documentId: String,
+    val content: String,
+    val updatedAtMillis: Long,
+)
+
+@Entity(
+    tableName = "ai_conversations",
+    foreignKeys = [
+        ForeignKey(
+            entity = CarEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["carId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = SetupConfigEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["configId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("localUserId"),
+        Index("carId"),
+        Index("configId")
+    ]
+)
+data class AiConversationEntity(
+    @PrimaryKey val id: String,
+    val localUserId: String,
+    val carId: String,
+    val configId: String,
+    val provider: String,
+    val modelId: String?,
+    val providerThreadRef: String?,
+    val lastTurnRef: String?,
+    val systemPromptVersion: Int,
+    val builtInDocsHash: String?,
+    val userDocsHash: String?,
+    val lastSentStateCount: Int,
+    val currentSetupHash: String?,
+    val summary: String?,
+    val title: String,
+    val createdAtMillis: Long,
+    val updatedAtMillis: Long,
+)
+
+@Entity(
+    tableName = "ai_messages",
+    foreignKeys = [
+        ForeignKey(
+            entity = AiConversationEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["conversationId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = SetupConfigStateEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["linkedConfigStateId"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
+    indices = [
+        Index("conversationId"),
+        Index("linkedConfigStateId"),
+        Index(value = ["conversationId", "seq"], unique = true)
+    ]
+)
+data class AiMessageEntity(
+    @PrimaryKey val id: String,
+    val conversationId: String,
+    val seq: Int,
+    val role: String,
+    val content: String,
+    val status: String,
+    val errorMessage: String?,
+    val modelId: String?,
+    val providerResponseId: String?,
+    val linkedConfigStateId: Long?,
+    val structuredRecommendationJson: String?,
+    val inputTokenCount: Int?,
+    val outputTokenCount: Int?,
+    val createdAtMillis: Long,
+)

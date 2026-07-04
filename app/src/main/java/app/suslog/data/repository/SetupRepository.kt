@@ -33,7 +33,7 @@ class SetupRepository(
             cars = cars,
             setupStateMachinesByCar = machines,
             setupConfigs = loadSetupConfigs(localUserId),
-            tuningDocuments = dao.getTuningDocuments(localUserId).map { it.toDomain() }
+            tuningDocuments = loadTuningDocuments(localUserId)
         )
     }
 
@@ -91,7 +91,21 @@ class SetupRepository(
     }
 
     suspend fun addTuningDocument(document: TuningDocument) {
-        dao.insertTuningDocument(document.toEntity())
+        dao.insertTuningDocumentWithContent(document)
+    }
+
+    private suspend fun loadTuningDocuments(localUserId: String): List<TuningDocument> {
+        val documents = dao.getTuningDocuments(localUserId)
+        if (documents.isEmpty()) {
+            return emptyList()
+        }
+
+        val contentsByDocumentId = dao.getTuningDocumentContents(documents.map { it.id })
+            .associateBy { it.documentId }
+
+        return documents.map { document ->
+            document.toDomain(contentsByDocumentId[document.id])
+        }
     }
 
     private suspend fun loadSetupConfigs(localUserId: String): List<SetupConfig> {

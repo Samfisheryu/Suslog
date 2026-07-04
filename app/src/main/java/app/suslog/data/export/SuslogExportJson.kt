@@ -15,7 +15,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object SuslogExportJson {
-    private const val SCHEMA_VERSION = 1
+    private const val SCHEMA_VERSION = 2
 
     fun build(
         cars: List<CarProfile>,
@@ -151,5 +151,6 @@ object SuslogExportJson {
             .put("id", document.id)
             .put("carId", document.carId)
             .put("name", document.name)
+            .put("content", document.content)
             .put("createdAtMillis", document.createdAtMillis)
 }

@@ -4,5 +4,6 @@ data class TuningDocument(
     val id: String,
     val carId: String,
     val name: String,
+    val content: String,
     val createdAtMillis: Long,
 )

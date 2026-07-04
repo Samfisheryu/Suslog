@@ -101,6 +101,7 @@ fun TuningScreen(
         TuningHistoryScreen(
             car = selectedCar,
             config = openedConfig,
+            userTuningDocuments = carDocuments,
             isActiveConfig = openedConfig.id == activeConfigId,
             onBack = { openedConfigId = null },
             onApplyState = { stateIndex, state ->
@@ -247,7 +248,10 @@ private fun AddDocumentForm(
     modifier: Modifier = Modifier,
 ) {
     var name by rememberSaveable(selectedCar?.id) { mutableStateOf("") }
-    val canSave = selectedCar != null && name.trim().isNotEmpty()
+    var content by rememberSaveable(selectedCar?.id) { mutableStateOf("") }
+    val canSave = selectedCar != null &&
+        name.trim().isNotEmpty() &&
+        content.trim().isNotEmpty()
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -273,6 +277,17 @@ private fun AddDocumentForm(
                 enabled = selectedCar != null,
                 singleLine = true
             )
+            OutlinedTextField(
+                value = content,
+                onValueChange = { content = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Document Content") },
+                enabled = selectedCar != null,
+                minLines = 6,
+                placeholder = {
+                    Text("Paste tuning notes, damper guide excerpts, or your own setup rules.")
+                }
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -291,6 +306,7 @@ private fun AddDocumentForm(
                                 id = UUID.randomUUID().toString(),
                                 carId = car.id,
                                 name = name.trim(),
+                                content = content.trim(),
                                 createdAtMillis = System.currentTimeMillis()
                             )
                         )
@@ -417,6 +433,7 @@ private fun TuningScreenPreview() {
         id = "preview-doc",
         carId = car.id,
         name = "KW 2-Way Adjustment Notes",
+        content = "Front rebound changes mostly affect entry response on this car.",
         createdAtMillis = 1_767_222_000_000
     )
 

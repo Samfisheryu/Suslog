@@ -6,6 +6,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import app.suslog.domain.setup.SetupConfig
 import app.suslog.domain.setup.SetupState
+import app.suslog.domain.tuning.TuningDocument
 
 @Dao
 interface SuslogDao {
@@ -47,6 +48,11 @@ interface SuslogDao {
     )
     suspend fun getTuningDocuments(localUserId: String): List<TuningDocumentEntity>
 
+    @Query("SELECT * FROM tuning_document_contents WHERE documentId IN (:documentIds)")
+    suspend fun getTuningDocumentContents(
+        documentIds: List<String>,
+    ): List<TuningDocumentContentEntity>
+
     @Insert
     suspend fun insertCar(car: CarEntity)
 
@@ -80,6 +86,71 @@ interface SuslogDao {
 
     @Insert
     suspend fun insertTuningDocument(document: TuningDocumentEntity)
+
+    @Insert
+    suspend fun insertTuningDocumentContent(content: TuningDocumentContentEntity)
+
+    @Query("SELECT * FROM ai_conversations WHERE configId = :configId ORDER BY updatedAtMillis DESC")
+    suspend fun getAiConversationsForConfig(configId: String): List<AiConversationEntity>
+
+    @Query("SELECT * FROM ai_messages WHERE conversationId = :conversationId ORDER BY seq ASC")
+    suspend fun getAiMessages(conversationId: String): List<AiMessageEntity>
+
+    @Insert
+    suspend fun insertAiConversation(conversation: AiConversationEntity)
+
+    @Insert
+    suspend fun insertAiMessage(message: AiMessageEntity)
+
+    @Query(
+        """
+        UPDATE ai_conversations
+        SET providerThreadRef = :providerThreadRef,
+            lastTurnRef = :lastTurnRef,
+            builtInDocsHash = :builtInDocsHash,
+            userDocsHash = :userDocsHash,
+            lastSentStateCount = :lastSentStateCount,
+            currentSetupHash = :currentSetupHash,
+            summary = :summary,
+            updatedAtMillis = :updatedAtMillis
+        WHERE id = :conversationId
+        """
+    )
+    suspend fun updateAiConversationState(
+        conversationId: String,
+        providerThreadRef: String?,
+        lastTurnRef: String?,
+        builtInDocsHash: String?,
+        userDocsHash: String?,
+        lastSentStateCount: Int,
+        currentSetupHash: String?,
+        summary: String?,
+        updatedAtMillis: Long,
+    )
+
+    @Query(
+        """
+        UPDATE ai_messages
+        SET status = :status,
+            errorMessage = :errorMessage,
+            content = :content,
+            providerResponseId = :providerResponseId,
+            structuredRecommendationJson = :structuredRecommendationJson,
+            inputTokenCount = :inputTokenCount,
+            outputTokenCount = :outputTokenCount
+        WHERE id = :messageId
+        """
+    )
+    suspend fun updateAiMessageResult(
+        messageId: String,
+        status: String,
+        errorMessage: String?,
+        content: String,
+        providerResponseId: String?,
+        structuredRecommendationJson: String?,
+        inputTokenCount: Int?,
+        outputTokenCount: Int?,
+    )
 
     @Query(
         """
@@ -137,6 +208,12 @@ interface SuslogDao {
 
     @Query("DELETE FROM cars WHERE localUserId = :localUserId")
     suspend fun deleteCarsForLocalUser(localUserId: String)
+
+    @Transaction
+    suspend fun insertTuningDocumentWithContent(document: TuningDocument) {
+        insertTuningDocument(document.toEntity())
+        insertTuningDocumentContent(document.toContentEntity())
+    }
 
     @Transaction
     suspend fun insertCarWithInitialState(

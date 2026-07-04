@@ -23,11 +23,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,10 +44,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.suslog.data.ai.AssetBuiltInTuningDocumentRepository
 import app.suslog.domain.car.CarProfile
 import app.suslog.domain.setup.SetupConfig
 import app.suslog.domain.setup.SetupConfigState
@@ -58,14 +64,21 @@ import app.suslog.domain.tuning.Axle
 import app.suslog.domain.tuning.SetupScoreV1
 import app.suslog.domain.tuning.SetupChangeSummary
 import app.suslog.domain.tuning.SetupChangeType
+import app.suslog.domain.tuning.TuningDocument
 import app.suslog.domain.tuning.TuningRecommendation
 import app.suslog.domain.tuning.buildTuningRecommendation
+import app.suslog.domain.tuning.ai.TuningAiContext
+import app.suslog.domain.tuning.ai.TuningAiContextBuilder
+import app.suslog.domain.tuning.ai.TuningAiReferenceDocument
+import app.suslog.domain.tuning.ai.TuningAiReferenceDocumentSource
 import app.suslog.domain.tuning.summarizeSetupChange
 import app.suslog.ui.common.DashedRule
 import app.suslog.ui.common.FitText
 import app.suslog.ui.common.TelemetryCard
 import app.suslog.ui.common.formatLapTime
 import app.suslog.ui.theme.SuslogTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.min
@@ -76,14 +89,19 @@ import kotlin.math.sin
 fun TuningHistoryScreen(
     car: CarProfile,
     config: SetupConfig,
+    userTuningDocuments: List<TuningDocument>,
     isActiveConfig: Boolean,
     onBack: () -> Unit,
     onApplyState: (Int, SetupConfigState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val states = config.states
     var requestedStateIndex by rememberSaveable(config.id, states.size) {
         mutableIntStateOf(states.lastIndex.coerceAtLeast(0))
+    }
+    var referenceDocuments by remember {
+        mutableStateOf<List<TuningAiReferenceDocument>>(emptyList())
     }
     val selectedStateIndex = requestedStateIndex.coerceIn(0, states.lastIndex.coerceAtLeast(0))
     val selectedState = states.getOrNull(selectedStateIndex)
@@ -99,8 +117,22 @@ fun TuningHistoryScreen(
         config = config,
         selectedStateIndex = selectedStateIndex
     )
+    val aiContext = TuningAiContextBuilder.build(
+        car = car,
+        config = config,
+        selectedStateIndex = selectedStateIndex,
+        modelRecommendation = recommendation,
+        referenceDocuments = referenceDocuments,
+        userDocuments = userTuningDocuments
+    )
     val bestLap = states.mapNotNull { it.lapTimeMillis }.minOrNull()
     val hasAnyFeedback = states.any { it.hasFeedback }
+
+    LaunchedEffect(context) {
+        referenceDocuments = withContext(Dispatchers.IO) {
+            AssetBuiltInTuningDocumentRepository(context).loadAll()
+        }
+    }
 
     Column(
         modifier = modifier
@@ -159,6 +191,16 @@ fun TuningHistoryScreen(
             }
         }
 
+        TelemetryCard(
+            title = "AI Tuning Assistant",
+            meta = if (referenceDocuments.isEmpty()) "LOADING DOCS" else "CONTEXT READY"
+        ) {
+            TuningAiPanel(
+                aiContext = aiContext,
+                docsLoaded = referenceDocuments.isNotEmpty()
+            )
+        }
+
         if (hasAnyFeedback) {
             TelemetryCard(title = "Balance Trend", meta = "NEUTRAL = 0") {
                 TrendHeader(
@@ -188,6 +230,95 @@ fun TuningHistoryScreen(
                 states = states,
                 selectedStateIndex = selectedStateIndex
             )
+        }
+    }
+}
+
+@Composable
+private fun TuningAiPanel(
+    aiContext: TuningAiContext,
+    docsLoaded: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    var issueText by rememberSaveable(aiContext.config.id) { mutableStateOf("") }
+    val quickIssues = listOf(
+        "Entry understeer",
+        "Mid-corner understeer",
+        "Exit oversteer",
+        "Too nervous",
+        "Too lazy",
+        "Poor bump compliance"
+    )
+    val builtInDocumentCount = aiContext.referenceDocuments.count {
+        it.source == TuningAiReferenceDocumentSource.BUILT_IN
+    }
+    val userDocumentCount = aiContext.referenceDocuments.size - builtInDocumentCount
+    val documentChars = aiContext.referenceDocuments.sumOf { it.content.length }
+    val contextSummary = buildString {
+        append("${aiContext.totalStateCount} states")
+        append(" · $builtInDocumentCount built-in docs")
+        if (userDocumentCount > 0) {
+            append(" · $userDocumentCount user docs")
+        }
+        if (documentChars > 0) {
+            append(" · ${(documentChars / 1000.0).roundToInt()}k doc chars")
+        }
+        append(" · S${aiContext.selectedStateIndex + 1} selected")
+    }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Describe what the car is doing. The assistant will use this config's setup history, the local tuning model, and the built-in documents as context.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        quickIssues.chunked(2).forEach { rowIssues ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowIssues.forEach { issue ->
+                    OutlinedButton(
+                        onClick = { issueText = issue },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        FitText(text = issue)
+                    }
+                }
+                if (rowIssues.size == 1) {
+                    Box(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+        OutlinedTextField(
+            value = issueText,
+            onValueChange = { issueText = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Driver issue") },
+            minLines = 3,
+            placeholder = {
+                Text("Example: entry understeer, then exit feels loose on throttle.")
+            }
+        )
+        Text(
+            text = if (docsLoaded) {
+                "Context ready: $contextSummary"
+            } else {
+                "Loading tuning documents..."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Button(
+            onClick = {},
+            enabled = false,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Analyze · AI provider not connected")
         }
     }
 }
@@ -1241,6 +1372,7 @@ private fun TuningHistoryScreenPreview() {
         TuningHistoryScreen(
             car = car,
             config = sampleHistoryConfig(car),
+            userTuningDocuments = emptyList(),
             isActiveConfig = true,
             onBack = {},
             onApplyState = { _, _ -> }

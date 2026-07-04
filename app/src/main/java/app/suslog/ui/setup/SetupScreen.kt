@@ -1181,21 +1181,29 @@ private fun AddCarScreen(
     onCancel: (() -> Unit)? = null,
     initialCar: CarProfile? = null,
 ) {
-    val initialAdjuster = initialCar?.adjusters?.firstOrNull()
     val isEditing = initialCar != null
     var carName by remember(initialCar?.id) { mutableStateOf(initialCar?.name.orEmpty()) }
     var suspensionType by remember(initialCar?.id) {
         mutableStateOf(initialCar?.suspensionType ?: setupDefaults.suspensionType)
     }
-    var maxClicksText by remember(initialCar?.id) {
-        mutableStateOf((initialAdjuster?.maxClicks ?: setupDefaults.maxClicks).toString())
-    }
-    var stiffSide by remember(initialCar?.id) {
-        mutableStateOf(initialAdjuster?.stiffSide ?: setupDefaults.stiffSide)
+    var adjusterDraftsByLabel by remember(initialCar?.id, setupDefaults) {
+        mutableStateOf(initialAdjusterDrafts(initialCar, setupDefaults))
     }
 
-    val maxClicks = maxClicksText.toIntOrNull()
-    val canAdd = carName.trim().isNotEmpty() && maxClicks != null && maxClicks in 1..99
+    fun draftFor(label: String): AdjusterDraft =
+        adjusterDraftsByLabel[label] ?: defaultAdjusterDraft(setupDefaults)
+
+    fun updateDraft(
+        label: String,
+        transform: (AdjusterDraft) -> AdjusterDraft,
+    ) {
+        adjusterDraftsByLabel = adjusterDraftsByLabel + (label to transform(draftFor(label)))
+    }
+
+    val canAdd = carName.trim().isNotEmpty() &&
+        suspensionType.adjusterLabels.all { label ->
+            draftFor(label).maxClicksText.toIntOrNull()?.let { it in 1..99 } == true
+        }
 
     Column(
         modifier = modifier
@@ -1244,44 +1252,91 @@ private fun AddCarScreen(
             }
         }
 
-        FormSection(title = "Click range") {
-            OutlinedTextField(
-                value = maxClicksText,
-                onValueChange = { maxClicksText = it.filter(Char::isDigit).take(2) },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Max click") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
-        }
-
-        FormSection(title = "Stiff side") {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ChoiceButton(
-                    label = "1 is stiff",
-                    selected = stiffSide == StiffSide.LOW_VALUE,
-                    onClick = { stiffSide = StiffSide.LOW_VALUE },
-                    modifier = Modifier.weight(1f)
-                )
-                ChoiceButton(
-                    label = "${maxClicks ?: 30} is stiff",
-                    selected = stiffSide == StiffSide.HIGH_VALUE,
-                    onClick = { stiffSide = StiffSide.HIGH_VALUE },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
         FormSection(title = "Adjusters") {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                suspensionType.adjusterLabels.forEach { label ->
-                    Text(
-                        text = "$label · 1-${maxClicks ?: 30} · ${stiffSide.label(maxClicks ?: 30)}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                suspensionType.adjusterLabels.forEachIndexed { index, label ->
+                    val draft = draftFor(label)
+                    val maxClicks = draft.maxClicksText.toIntOrNull()
+                    val validMaxClicks = maxClicks != null && maxClicks in 1..99
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = label,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (validMaxClicks) {
+                                    "1-$maxClicks"
+                                } else {
+                                    "Invalid range"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        OutlinedTextField(
+                            value = draft.maxClicksText,
+                            onValueChange = { next ->
+                                updateDraft(label) {
+                                    it.copy(maxClicksText = next.filter(Char::isDigit).take(2))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Max click") },
+                            singleLine = true,
+                            isError = draft.maxClicksText.isNotEmpty() && !validMaxClicks,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ChoiceButton(
+                                label = "1 is stiff",
+                                selected = draft.stiffSide == StiffSide.LOW_VALUE,
+                                onClick = {
+                                    updateDraft(label) {
+                                        it.copy(stiffSide = StiffSide.LOW_VALUE)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            ChoiceButton(
+                                label = if (validMaxClicks) {
+                                    "$maxClicks is stiff"
+                                } else {
+                                    "Max is stiff"
+                                },
+                                selected = draft.stiffSide == StiffSide.HIGH_VALUE,
+                                onClick = {
+                                    updateDraft(label) {
+                                        it.copy(stiffSide = StiffSide.HIGH_VALUE)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Text(
+                            text = if (validMaxClicks) {
+                                draft.stiffSide.label(maxClicks)
+                            } else {
+                                "Enter a click count from 1 to 99."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    if (index != suspensionType.adjusterLabels.lastIndex) {
+                        HorizontalDivider()
+                    }
                 }
             }
         }
@@ -1300,19 +1355,28 @@ private fun AddCarScreen(
             }
             Button(
                 onClick = {
-                    val clickCount = maxClicks ?: return@Button
+                    val adjusters = suspensionType.adjusterLabels.mapNotNull { label ->
+                        val draft = draftFor(label)
+                        val clickCount = draft.maxClicksText
+                            .toIntOrNull()
+                            ?.takeIf { it in 1..99 }
+                            ?: return@mapNotNull null
+
+                        AdjusterSpec(
+                            label = label,
+                            maxClicks = clickCount,
+                            stiffSide = draft.stiffSide
+                        )
+                    }
+
+                    if (adjusters.size != suspensionType.adjusterLabels.size) return@Button
+
                     onAddCar(
                         CarProfile(
                             id = initialCar?.id ?: UUID.randomUUID().toString(),
                             name = carName.trim(),
                             suspensionType = suspensionType,
-                            adjusters = suspensionType.adjusterLabels.map { label ->
-                                AdjusterSpec(
-                                    label = label,
-                                    maxClicks = clickCount,
-                                    stiffSide = stiffSide
-                                )
-                            }
+                            adjusters = adjusters
                         )
                     )
                 },
@@ -1324,6 +1388,36 @@ private fun AddCarScreen(
         }
     }
 }
+
+private data class AdjusterDraft(
+    val maxClicksText: String,
+    val stiffSide: StiffSide,
+)
+
+private fun initialAdjusterDrafts(
+    initialCar: CarProfile?,
+    setupDefaults: SetupDefaults,
+): Map<String, AdjusterDraft> =
+    initialCar
+        ?.adjusters
+        ?.associate { adjuster ->
+            adjuster.label to AdjusterDraft(
+                maxClicksText = adjuster.maxClicks.toString(),
+                stiffSide = adjuster.stiffSide
+            )
+        }
+        .orEmpty()
+        .ifEmpty {
+            setupDefaults.suspensionType.adjusterLabels.associateWith {
+                defaultAdjusterDraft(setupDefaults)
+            }
+        }
+
+private fun defaultAdjusterDraft(setupDefaults: SetupDefaults): AdjusterDraft =
+    AdjusterDraft(
+        maxClicksText = setupDefaults.maxClicks.toString(),
+        stiffSide = setupDefaults.stiffSide
+    )
 
 @Composable
 private fun FormSection(

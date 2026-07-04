@@ -73,6 +73,7 @@ class AiCredentialStore(
         prefs.edit()
             .remove(apiKeyKey(userId))
             .remove(modelKey(userId))
+            .remove(monthlyBudgetKey(userId))
             .apply()
     }
 

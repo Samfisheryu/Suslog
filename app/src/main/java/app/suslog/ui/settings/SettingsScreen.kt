@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.suslog.data.ai.AiCredentialStore
@@ -662,6 +663,9 @@ private fun OpenAiConnectionRow(
     var apiKey by remember(activeAccountId) { mutableStateOf("") }
     var model by remember(activeAccountId) { mutableStateOf(credentials.model) }
     var connected by remember(activeAccountId) { mutableStateOf(credentials.isConnected) }
+    var editingConnection by remember(activeAccountId) {
+        mutableStateOf(!credentials.isConnected)
+    }
     var monthlyBudgetUsd by remember(activeAccountId) {
         mutableStateOf(credentials.monthlyBudgetUsd)
     }
@@ -694,6 +698,9 @@ private fun OpenAiConnectionRow(
     var modelsError by remember(activeAccountId) { mutableStateOf<String?>(null) }
     var modelMenuOpen by remember(activeAccountId) { mutableStateOf(false) }
     val enabled = activeAccountId != null
+    val detailsLocked = enabled && connected && !editingConnection
+    val detailFieldsEnabled = enabled && !detailsLocked
+    val apiKeyFieldValue = if (detailsLocked) "************" else apiKey
 
     fun loadModels() {
         if (!enabled || loadingModels) return
@@ -768,21 +775,25 @@ private fun OpenAiConnectionRow(
             }
         }
         OutlinedTextField(
-            value = apiKey,
+            value = apiKeyFieldValue,
             onValueChange = {
                 apiKey = it
-                connected = false
             },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("API key (sk-…)") },
             placeholder = {
-                if (connected) {
-                    Text("Saved key")
+                when {
+                    detailsLocked -> Text("************")
+                    connected -> Text("Leave blank to keep saved key")
                 }
             },
-            enabled = enabled,
+            enabled = detailFieldsEnabled,
             singleLine = true,
-            visualTransformation = PasswordVisualTransformation()
+            visualTransformation = if (detailsLocked) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            }
         )
         Box(modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(
@@ -827,23 +838,48 @@ private fun OpenAiConnectionRow(
         ) {
             Button(
                 onClick = {
-                    credentials.apiKey = apiKey
+                    if (detailsLocked) {
+                        editingConnection = true
+                        apiKey = ""
+                        budgetInput = monthlyBudgetUsd?.formatBudgetInput().orEmpty()
+                        budgetError = null
+                        return@Button
+                    }
+
+                    val parsedBudget = budgetInput.parseUsdInput()
+                    if (budgetInput.isNotBlank() && parsedBudget == null) {
+                        budgetError = "Enter a positive dollar amount."
+                        return@Button
+                    }
+
+                    if (apiKey.isNotBlank()) {
+                        credentials.apiKey = apiKey
+                    }
                     credentials.model = model
+                    credentials.monthlyBudgetUsd = parsedBudget
+                    monthlyBudgetUsd = parsedBudget
+                    budgetInput = parsedBudget?.formatBudgetInput().orEmpty()
+                    budgetError = null
                     connected = credentials.isConnected
                     apiKey = ""
+                    editingConnection = !connected
                 },
-                enabled = enabled && apiKey.isNotBlank(),
+                enabled = enabled && (detailsLocked || connected || apiKey.isNotBlank()),
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Save")
+                Text(if (detailsLocked) "Edit" else "Save")
             }
             OutlinedButton(
                 onClick = {
                     credentials.clear()
                     apiKey = ""
                     model = credentials.model
+                    monthlyBudgetUsd = null
+                    budgetInput = ""
+                    budgetError = null
                     models = emptyList()
                     connected = false
+                    editingConnection = true
                 },
                 enabled = enabled,
                 modifier = Modifier.weight(1f)
@@ -865,27 +901,9 @@ private fun OpenAiConnectionRow(
         MonthlyBudgetEditor(
             value = budgetInput,
             error = budgetError,
-            enabled = enabled,
+            enabled = detailFieldsEnabled,
             onValueChange = {
                 budgetInput = it
-                budgetError = null
-            },
-            onSave = {
-                val parsed = budgetInput.parseUsdInput()
-                if (budgetInput.isNotBlank() && parsed == null) {
-                    budgetError = "Enter a positive dollar amount."
-                    return@MonthlyBudgetEditor
-                }
-
-                credentials.monthlyBudgetUsd = parsed
-                monthlyBudgetUsd = parsed
-                budgetInput = parsed?.formatBudgetInput().orEmpty()
-                budgetError = null
-            },
-            onClear = {
-                credentials.monthlyBudgetUsd = null
-                monthlyBudgetUsd = null
-                budgetInput = ""
                 budgetError = null
             }
         )
@@ -1075,8 +1093,6 @@ private fun MonthlyBudgetEditor(
     error: String?,
     enabled: Boolean,
     onValueChange: (String) -> Unit,
-    onSave: () -> Unit,
-    onClear: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
@@ -1093,25 +1109,6 @@ private fun MonthlyBudgetEditor(
                 Text(error ?: "USD budget for local Suslog AI usage.")
             }
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Button(
-                onClick = onSave,
-                enabled = enabled,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Save Budget")
-            }
-            OutlinedButton(
-                onClick = onClear,
-                enabled = enabled,
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Clear Budget")
-            }
-        }
     }
 }
 

@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -24,8 +26,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -54,8 +58,10 @@ private enum class TuningSection(
 }
 
 private data class TuningListItem(
+    val id: String,
     val name: String,
     val badge: String? = null,
+    val content: String,
 )
 
 @Composable
@@ -76,7 +82,17 @@ fun TuningScreen(
 ) {
     var selectedSection by rememberSaveable { mutableStateOf(TuningSection.DOCS) }
     var openedConfigId by rememberSaveable { mutableStateOf<String?>(null) }
+    var openedDocumentId by rememberSaveable { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
     val selectedCar = cars.firstOrNull { it.id == selectedCarId } ?: cars.firstOrNull()
+    val builtInDocumentContents = remember(context) {
+        BuiltInTuningDocuments.all.associate { document ->
+            document.id to context.applicationContext.assets
+                .open(document.assetPath)
+                .bufferedReader()
+                .use { it.readText() }
+        }
+    }
     val carDocuments = selectedCar?.let { car ->
         tuningDocuments.filter { it.carId == car.id }
     }.orEmpty()
@@ -84,15 +100,26 @@ fun TuningScreen(
         emptyList()
     } else {
         BuiltInTuningDocuments.all.map { document ->
-            TuningListItem(name = document.title, badge = "Built-in")
+            TuningListItem(
+                id = document.id,
+                name = document.title,
+                badge = "Built-in",
+                content = builtInDocumentContents[document.id].orEmpty()
+            )
         } + carDocuments.map { document ->
-            TuningListItem(name = document.name, badge = "Custom")
+            TuningListItem(
+                id = document.id,
+                name = document.name,
+                badge = "Custom",
+                content = document.content
+            )
         }
     }
     val carConfigs = selectedCar?.let { car ->
         setupConfigs.filter { it.carId == car.id }
     }.orEmpty()
     val openedConfig = carConfigs.firstOrNull { it.id == openedConfigId }
+    val openedDocument = documentItems.firstOrNull { it.id == openedDocumentId }
 
     LaunchedEffect(cars.size, selectedCarId) {
         if (cars.isNotEmpty() && selectedCar == null) {
@@ -104,6 +131,7 @@ fun TuningScreen(
         if (showAddDocument) {
             selectedSection = TuningSection.DOCS
             openedConfigId = null
+            openedDocumentId = null
         }
     }
 
@@ -154,6 +182,7 @@ fun TuningScreen(
                 selectedSection = it
                 if (it != TuningSection.DOCS) {
                     onShowAddDocumentChange(false)
+                    openedDocumentId = null
                 }
             }
         )
@@ -169,15 +198,33 @@ fun TuningScreen(
             )
         }
 
+        if (openedDocument != null) {
+            TuningDocumentReader(
+                document = openedDocument,
+                modifier = Modifier.weight(1f),
+                onBack = { openedDocumentId = null }
+            )
+            return@Column
+        }
+
         when (selectedSection) {
             TuningSection.DOCS -> TuningNameList(
                 items = documentItems,
                 emptyTitle = if (selectedCar == null) "No Car" else "No tuning docs yet",
+                onItemClick = { index ->
+                    openedDocumentId = documentItems.getOrNull(index)?.id
+                },
                 modifier = Modifier.weight(1f)
             )
 
             TuningSection.CONFIGS -> TuningNameList(
-                items = carConfigs.map { TuningListItem(name = it.name) },
+                items = carConfigs.map {
+                    TuningListItem(
+                        id = it.id,
+                        name = it.name,
+                        content = ""
+                    )
+                },
                 emptyTitle = if (selectedCar == null) "No Car" else "No setup configs yet",
                 onItemClick = { index ->
                     openedConfigId = carConfigs.getOrNull(index)?.id
@@ -411,6 +458,66 @@ private fun TuningNameRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun TuningDocumentReader(
+    document: TuningListItem,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onBack,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text("Back")
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                FitText(
+                    text = document.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Start
+                )
+                document.badge?.let { badge ->
+                    Text(
+                        text = badge,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Text(
+                text = document.content.ifBlank { "This document is empty." },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }

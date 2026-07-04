@@ -39,6 +39,7 @@ import app.suslog.domain.setup.defaultSetup
 import app.suslog.domain.suspension.AdjusterSpec
 import app.suslog.domain.suspension.StiffSide
 import app.suslog.domain.suspension.SuspensionType
+import app.suslog.domain.tuning.BuiltInTuningDocuments
 import app.suslog.domain.tuning.TuningDocument
 import app.suslog.ui.common.FitText
 import app.suslog.ui.setup.SetupRecommendation
@@ -51,6 +52,11 @@ private enum class TuningSection(
     DOCS("Tuning Docs"),
     CONFIGS("Setup Configs"),
 }
+
+private data class TuningListItem(
+    val name: String,
+    val badge: String? = null,
+)
 
 @Composable
 fun TuningScreen(
@@ -74,6 +80,15 @@ fun TuningScreen(
     val carDocuments = selectedCar?.let { car ->
         tuningDocuments.filter { it.carId == car.id }
     }.orEmpty()
+    val documentItems = if (selectedCar == null) {
+        emptyList()
+    } else {
+        BuiltInTuningDocuments.all.map { document ->
+            TuningListItem(name = document.title, badge = "Built-in")
+        } + carDocuments.map { document ->
+            TuningListItem(name = document.name, badge = "Custom")
+        }
+    }
     val carConfigs = selectedCar?.let { car ->
         setupConfigs.filter { it.carId == car.id }
     }.orEmpty()
@@ -156,13 +171,13 @@ fun TuningScreen(
 
         when (selectedSection) {
             TuningSection.DOCS -> TuningNameList(
-                items = carDocuments.map { it.name },
+                items = documentItems,
                 emptyTitle = if (selectedCar == null) "No Car" else "No tuning docs yet",
                 modifier = Modifier.weight(1f)
             )
 
             TuningSection.CONFIGS -> TuningNameList(
-                items = carConfigs.map { it.name },
+                items = carConfigs.map { TuningListItem(name = it.name) },
                 emptyTitle = if (selectedCar == null) "No Car" else "No setup configs yet",
                 onItemClick = { index ->
                     openedConfigId = carConfigs.getOrNull(index)?.id
@@ -328,7 +343,7 @@ private fun AddDocumentForm(
 
 @Composable
 private fun TuningNameList(
-    items: List<String>,
+    items: List<TuningListItem>,
     emptyTitle: String,
     modifier: Modifier = Modifier,
     onItemClick: ((Int) -> Unit)? = null,
@@ -347,7 +362,7 @@ private fun TuningNameList(
     ) {
         items(items.size) { index ->
             TuningNameRow(
-                name = items[index],
+                item = items[index],
                 onClick = onItemClick?.let { { it(index) } }
             )
         }
@@ -356,7 +371,7 @@ private fun TuningNameList(
 
 @Composable
 private fun TuningNameRow(
-    name: String,
+    item: TuningListItem,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -375,14 +390,28 @@ private fun TuningNameRow(
         tonalElevation = 1.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        FitText(
-            text = name,
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            FitText(
+                text = item.name,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Start
+            )
+            item.badge?.let { badge ->
+                Text(
+                    text = badge,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
+import app.suslog.data.ai.AiUsageByModel
 import app.suslog.domain.setup.SetupConfig
 import app.suslog.domain.setup.SetupState
 import app.suslog.domain.tuning.TuningDocument
@@ -111,6 +112,33 @@ interface SuslogDao {
 
     @Query("SELECT * FROM ai_messages WHERE conversationId = :conversationId ORDER BY seq ASC")
     suspend fun getAiMessages(conversationId: String): List<AiMessageEntity>
+
+    @Query(
+        """
+        SELECT COALESCE(ai_messages.modelId, ai_conversations.modelId, 'unknown') AS modelId,
+            COALESCE(SUM(COALESCE(ai_messages.inputTokenCount, 0)), 0) AS inputTokens,
+            COALESCE(SUM(COALESCE(ai_messages.outputTokenCount, 0)), 0) AS outputTokens,
+            COUNT(*) AS requestCount
+        FROM ai_messages
+        INNER JOIN ai_conversations ON ai_messages.conversationId = ai_conversations.id
+        WHERE ai_conversations.localUserId = :localUserId
+            AND ai_conversations.provider = :provider
+            AND ai_messages.status = 'complete'
+            AND ai_messages.createdAtMillis >= :startMillis
+            AND ai_messages.createdAtMillis <= :endMillis
+            AND (
+                ai_messages.inputTokenCount IS NOT NULL OR
+                ai_messages.outputTokenCount IS NOT NULL
+            )
+        GROUP BY COALESCE(ai_messages.modelId, ai_conversations.modelId, 'unknown')
+        """
+    )
+    suspend fun getAiUsageByModel(
+        localUserId: String,
+        provider: String,
+        startMillis: Long,
+        endMillis: Long,
+    ): List<AiUsageByModel>
 
     @Insert
     suspend fun insertAiConversation(conversation: AiConversationEntity)

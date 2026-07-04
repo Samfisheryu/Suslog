@@ -1,12 +1,14 @@
 package app.suslog.ui.settings
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,13 +16,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -38,14 +41,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.suslog.data.ai.AiCredentialStore
+import app.suslog.data.ai.AiUsageRepository
+import app.suslog.data.ai.AiUsageSummary
 import app.suslog.data.ai.OpenAiTuningAiClient
+import app.suslog.data.local.SuslogDatabase
 import app.suslog.domain.suspension.StiffSide
 import app.suslog.domain.suspension.SuspensionType
 import app.suslog.settings.BiometricAuthStatus
@@ -55,6 +63,7 @@ import app.suslog.ui.common.ChoiceButton
 import app.suslog.ui.common.SectionHeader
 import app.suslog.ui.theme.SuslogTheme
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
@@ -612,22 +621,78 @@ private fun countLabel(
 ): String =
     "$count ${if (count == 1) singular else "${singular}s"}"
 
+private fun Double.formatBudgetInput(): String =
+    String.format(Locale.US, "%.2f", this)
+
+private fun Double.formatUsd(): String =
+    "$" + String.format(Locale.US, "%.2f", this)
+
+private fun Long.formatTokens(): String =
+    String.format(Locale.US, "%,d", this)
+
+private fun String.parseUsdInput(): Double? {
+    val normalized = trim()
+        .removePrefix("$")
+        .replace(",", "")
+
+    if (normalized.isBlank()) return null
+
+    return normalized.toDoubleOrNull()?.takeIf { it > 0.0 }
+}
+
+private fun previewAiUsageSummary(): AiUsageSummary =
+    AiUsageSummary(
+        inputTokens = 124_300,
+        outputTokens = 18_420,
+        requestCount = 12,
+        estimatedCostUsd = 0.42,
+        unpricedModelCount = 0,
+        periodStartMillis = 0L,
+        periodEndMillis = 0L
+    )
+
 @Composable
 private fun OpenAiConnectionRow(
     activeAccountId: String?,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val inPreview = LocalInspectionMode.current
     val credentials = remember(activeAccountId) { AiCredentialStore(context, activeAccountId) }
     var apiKey by remember(activeAccountId) { mutableStateOf("") }
     var model by remember(activeAccountId) { mutableStateOf(credentials.model) }
     var connected by remember(activeAccountId) { mutableStateOf(credentials.isConnected) }
+    var monthlyBudgetUsd by remember(activeAccountId) {
+        mutableStateOf(credentials.monthlyBudgetUsd)
+    }
+    var budgetInput by remember(activeAccountId) {
+        mutableStateOf(monthlyBudgetUsd?.formatBudgetInput().orEmpty())
+    }
+    var budgetError by remember(activeAccountId) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val client = remember { OpenAiTuningAiClient() }
-    var models by remember { mutableStateOf<List<String>>(emptyList()) }
-    var loadingModels by remember { mutableStateOf(false) }
-    var modelsError by remember { mutableStateOf<String?>(null) }
-    var modelMenuOpen by remember { mutableStateOf(false) }
+    val usageRepository = remember(inPreview) {
+        if (inPreview) {
+            null
+        } else {
+            AiUsageRepository(SuslogDatabase.getInstance(context).suslogDao())
+        }
+    }
+    var usage by remember(activeAccountId, inPreview) {
+        mutableStateOf(
+            if (inPreview) {
+                previewAiUsageSummary()
+            } else {
+                null
+            }
+        )
+    }
+    var usageLoading by remember(activeAccountId) { mutableStateOf(false) }
+    var usageError by remember(activeAccountId) { mutableStateOf<String?>(null) }
+    var models by remember(activeAccountId) { mutableStateOf<List<String>>(emptyList()) }
+    var loadingModels by remember(activeAccountId) { mutableStateOf(false) }
+    var modelsError by remember(activeAccountId) { mutableStateOf<String?>(null) }
+    var modelMenuOpen by remember(activeAccountId) { mutableStateOf(false) }
     val enabled = activeAccountId != null
 
     fun loadModels() {
@@ -651,6 +716,24 @@ private fun OpenAiConnectionRow(
 
     LaunchedEffect(connected) {
         if (connected && models.isEmpty()) loadModels()
+    }
+
+    LaunchedEffect(activeAccountId, usageRepository) {
+        val userId = activeAccountId
+        if (userId == null || usageRepository == null) {
+            usage = if (inPreview) previewAiUsageSummary() else null
+            usageLoading = false
+            return@LaunchedEffect
+        }
+
+        usageLoading = true
+        usageError = null
+        usage = runCatching {
+            usageRepository.loadCurrentMonthOpenAiUsage(userId)
+        }
+            .onFailure { usageError = it.message ?: "Could not load AI usage." }
+            .getOrNull()
+        usageLoading = false
     }
 
     Column(
@@ -773,6 +856,262 @@ private fun OpenAiConnectionRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        AiUsageCard(
+            usage = usage,
+            loading = usageLoading,
+            error = usageError,
+            monthlyBudgetUsd = monthlyBudgetUsd
+        )
+        MonthlyBudgetEditor(
+            value = budgetInput,
+            error = budgetError,
+            enabled = enabled,
+            onValueChange = {
+                budgetInput = it
+                budgetError = null
+            },
+            onSave = {
+                val parsed = budgetInput.parseUsdInput()
+                if (budgetInput.isNotBlank() && parsed == null) {
+                    budgetError = "Enter a positive dollar amount."
+                    return@MonthlyBudgetEditor
+                }
+
+                credentials.monthlyBudgetUsd = parsed
+                monthlyBudgetUsd = parsed
+                budgetInput = parsed?.formatBudgetInput().orEmpty()
+                budgetError = null
+            },
+            onClear = {
+                credentials.monthlyBudgetUsd = null
+                monthlyBudgetUsd = null
+                budgetInput = ""
+                budgetError = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun AiUsageCard(
+    usage: AiUsageSummary?,
+    loading: Boolean,
+    error: String?,
+    monthlyBudgetUsd: Double?,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "AI Usage",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "This month",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            when {
+                loading -> Text(
+                    text = "Loading usage...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                error != null -> Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+
+                usage == null -> Text(
+                    text = "Login to a local account to view usage.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                else -> AiUsageDetails(
+                    usage = usage,
+                    monthlyBudgetUsd = monthlyBudgetUsd
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AiUsageDetails(
+    usage: AiUsageSummary,
+    monthlyBudgetUsd: Double?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        UsageMetricRow(label = "Input", value = usage.inputTokens.formatTokens())
+        UsageMetricRow(label = "Output", value = usage.outputTokens.formatTokens())
+        UsageMetricRow(label = "Total", value = usage.totalTokens.formatTokens())
+        UsageMetricRow(label = "Requests", value = usage.requestCount.formatTokens())
+
+        val costText = usage.estimatedCostUsd?.formatUsd() ?: "Unavailable"
+        UsageMetricRow(label = "Estimated cost", value = costText)
+
+        if (monthlyBudgetUsd != null && usage.estimatedCostUsd != null) {
+            val progress = (usage.estimatedCostUsd / monthlyBudgetUsd).coerceAtLeast(0.0)
+            UsageBudgetProgress(
+                progress = progress,
+                costUsd = usage.estimatedCostUsd,
+                monthlyBudgetUsd = monthlyBudgetUsd
+            )
+        } else if (monthlyBudgetUsd == null) {
+            Text(
+                text = "Set a monthly budget to show a progress bar.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (usage.unpricedModelCount > 0) {
+            Text(
+                text = "Some models do not have local pricing, so cost progress is hidden.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Text(
+                text = "Estimate uses local Suslog requests only; OpenAI billing may differ.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun UsageMetricRow(
+    label: String,
+    value: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+private fun UsageBudgetProgress(
+    progress: Double,
+    costUsd: Double,
+    monthlyBudgetUsd: Double,
+) {
+    val clamped = progress.coerceIn(0.0, 1.0).toFloat()
+    val progressColor = when {
+        progress >= 1.0 -> MaterialTheme.colorScheme.error
+        progress >= 0.8 -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "${costUsd.formatUsd()} / ${monthlyBudgetUsd.formatUsd()}",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "${(progress * 100.0).toInt()}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(99.dp))
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(clamped)
+                    .fillMaxHeight()
+                    .background(progressColor)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MonthlyBudgetEditor(
+    value: String,
+    error: String?,
+    enabled: Boolean,
+    onValueChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Monthly budget (optional)") },
+            placeholder = { Text("5.00") },
+            enabled = enabled,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            isError = error != null,
+            supportingText = {
+                Text(error ?: "USD budget for local Suslog AI usage.")
+            }
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = onSave,
+                enabled = enabled,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Save Budget")
+            }
+            OutlinedButton(
+                onClick = onClear,
+                enabled = enabled,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Clear Budget")
+            }
+        }
     }
 }
 
@@ -863,5 +1202,20 @@ private fun SettingsScreenPreview() {
             onShowPreviousFeedbackReferenceChange = {},
             onShowSetupDebugInfoChange = {}
         )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390)
+@Composable
+private fun AiUsageCardPreview() {
+    SuslogTheme {
+        Column(modifier = Modifier.padding(16.dp)) {
+            AiUsageCard(
+                usage = previewAiUsageSummary(),
+                loading = false,
+                error = null,
+                monthlyBudgetUsd = 5.00
+            )
+        }
     }
 }

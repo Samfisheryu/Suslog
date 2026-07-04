@@ -50,6 +50,24 @@ class AiCredentialStore(
             return prefs.contains(apiKeyKey(userId))
         }
 
+    var monthlyBudgetUsd: Double?
+        get() {
+            val userId = localUserId ?: return null
+            return prefs.getString(monthlyBudgetKey(userId), null)
+                ?.toDoubleOrNull()
+                ?.takeIf { it > 0.0 }
+        }
+        set(value) {
+            val userId = localUserId ?: return
+            val editor = prefs.edit()
+            if (value == null || value <= 0.0) {
+                editor.remove(monthlyBudgetKey(userId))
+            } else {
+                editor.putString(monthlyBudgetKey(userId), value.toString())
+            }
+            editor.apply()
+        }
+
     fun clear() {
         val userId = localUserId ?: return
         prefs.edit()
@@ -107,6 +125,9 @@ class AiCredentialStore(
 
     private fun modelKey(localUserId: String): String =
         "openai_model_$localUserId"
+
+    private fun monthlyBudgetKey(localUserId: String): String =
+        "openai_monthly_budget_usd_$localUserId"
 
     companion object {
         const val DEFAULT_MODEL = "gpt-4o-mini"

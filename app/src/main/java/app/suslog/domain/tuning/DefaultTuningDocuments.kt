@@ -1,0 +1,27 @@
+package app.suslog.domain.tuning
+
+data class DefaultTuningDocument(
+    val id: String,
+    val title: String,
+    val assetPath: String,
+)
+
+object DefaultTuningDocuments {
+    val all: List<DefaultTuningDocument> = listOf(
+        DefaultTuningDocument(
+            id = "coilover-complete-guide",
+            title = "Coilover Track Tuning Complete Guide",
+            assetPath = "tuning_docs/coilover_complete_guide.md"
+        ),
+        DefaultTuningDocument(
+            id = "two-way-coilover-guide",
+            title = "Two-Way Coilover Tuning Guide",
+            assetPath = "tuning_docs/two_way_coilover_guide.md"
+        ),
+        DefaultTuningDocument(
+            id = "damper-basics-guide",
+            title = "Damper Basics Tuning Guide",
+            assetPath = "tuning_docs/damper_basics_guide.md"
+        )
+    )
+}

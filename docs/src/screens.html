@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>SusLog — screens</title>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#e9ece5; --paper:#eef0ea; --panel:#fff; --inset:#e7eae2;
+    --line:#d2d7cb; --line-soft:#e0e4d9;
+    --lime:#5c7d12; --lime-bright:#bdee36; --lime-dim:#a7bc6a; --cyan:#2fb6c8;
+    --amber:#bf7d14;
+    --ink:#171c1d; --ink-2:#55615e; --ink-3:#8a9590;
+    --mono:'JetBrains Mono',monospace; --disp:'Chakra Petch',sans-serif;
+    --ai:linear-gradient(120deg,#bdee36 0%,#7fe0c0 45%,#4fd0e6 100%);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#fff;color:var(--ink);font-family:var(--mono);
+    width:1300px;padding:16px 20px 16px;display:flex;flex-direction:column;align-items:center}
+
+  .title{font-family:var(--disp);font-weight:700;font-size:20px;letter-spacing:.06em;margin-bottom:2px}
+  .title b{color:var(--lime)}
+  .sub{font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--ink-3);margin-bottom:12px}
+
+  .rack{display:flex;gap:18px;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:8px;width:300px}
+  .cap{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-2);font-weight:700}
+  .cap b{color:var(--lime)}
+
+  .device{width:300px;background:linear-gradient(180deg,#fff,#edefe9);border:1px solid var(--line);
+    border-radius:30px;padding:8px;box-shadow:0 30px 60px -30px rgba(45,55,48,.45)}
+  .screen{height:606px;background:var(--bg);border:1px solid var(--line-soft);border-radius:24px;
+    overflow:hidden;position:relative;display:flex;flex-direction:column}
+
+  .status{display:flex;justify-content:space-between;align-items:center;padding:9px 15px 6px;
+    font-size:9px;color:var(--ink-2);letter-spacing:.05em}
+  .status .dots{letter-spacing:.12em}
+  .body{flex:1;padding:4px 13px 10px;overflow:hidden;display:flex;flex-direction:column;gap:9px}
+
+  /* nav */
+  .nav{display:flex;align-items:flex-end;justify-content:space-between;padding:8px 18px 12px;
+    border-top:1px solid var(--line-soft);background:var(--paper);position:relative}
+  .nav .n{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:700;
+    display:flex;flex-direction:column;align-items:center;gap:4px;width:48px}
+  .nav .n .ic{width:14px;height:14px;border:1.6px solid var(--ink-3);border-radius:4px}
+  .nav .n.on{color:var(--lime)}
+  .nav .n.on .ic{border-color:var(--lime);background:rgba(189,238,54,.35)}
+  .nav .fab{width:40px;height:40px;border-radius:50%;background:var(--lime-bright);
+    display:grid;place-items:center;color:#31420a;font-size:20px;font-weight:700;
+    box-shadow:0 6px 16px rgba(120,160,30,.5);margin-bottom:2px}
+
+  /* generic bits */
+  .selrow{display:flex;gap:8px}
+  .sel{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:9px;
+    padding:8px 11px;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600}
+  .sel .cv{color:var(--ink-3);font-size:10px}
+  .sh{display:flex;align-items:center;gap:7px}
+  .sh .bar{width:3px;height:12px;background:var(--lime);border-radius:2px}
+  .sh .t{font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--ink-2);text-transform:uppercase}
+  .sh .meta{margin-left:auto;font-size:8px;letter-spacing:.12em;color:var(--ink-3);text-transform:uppercase}
+
+  .banner{background:rgba(189,238,54,.22);border:1px solid var(--lime-dim);border-radius:9px;
+    padding:8px 10px;display:flex;align-items:center;gap:8px}
+  .banner .d{font-size:11px;color:#3f5510;font-weight:600;flex:1;line-height:1.35}
+  .banner .d b{color:var(--lime)}
+  .banner .go{font-size:10px;font-weight:700;color:#31420a;background:var(--lime-bright);border-radius:6px;padding:4px 9px}
+
+  .toggle{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:9px 11px;
+    display:flex;align-items:center;gap:9px}
+  .toggle .tl{flex:1}
+  .toggle .tt{font-size:12px;font-weight:600}
+  .toggle .ts{font-size:9px;color:var(--ink-3);margin-top:2px}
+  .sw{width:34px;height:19px;border-radius:12px;background:var(--lime);position:relative;flex:none}
+  .sw::after{content:"";position:absolute;top:2px;right:2px;width:15px;height:15px;border-radius:50%;background:#fff}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .corner{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:9px}
+  .corner .cl{font-size:10px;font-weight:700;letter-spacing:.08em;margin-bottom:7px}
+  .corner .cl b{color:var(--lime)}
+  .step{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+  .step .lbl{font-size:8px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
+  .step .ct{display:flex;align-items:center;gap:6px}
+  .step .b{width:17px;height:17px;border:1px solid var(--line);border-radius:5px;display:grid;place-items:center;
+    font-size:11px;color:var(--ink-2);background:var(--inset)}
+  .step .v{font-family:var(--disp);font-weight:700;font-size:14px;min-width:16px;text-align:center}
+
+  .save{margin-top:auto;background:linear-gradient(180deg,#6f9418,#5c7d12);color:#eaf3d4;
+    border-radius:10px;text-align:center;padding:12px;font-family:var(--disp);font-weight:700;
+    font-size:14px;letter-spacing:.08em;box-shadow:0 8px 18px -8px rgba(92,125,18,.7)}
+
+  /* tuning */
+  .tl-line{display:flex;align-items:center;gap:0;padding:6px 2px}
+  .tl-line .n{flex:none;width:11px;height:11px;border-radius:50%;border:2px solid var(--line);background:var(--panel)}
+  .tl-line .n.on{background:var(--lime);border-color:var(--lime);box-shadow:0 0 0 4px rgba(189,238,54,.4)}
+  .tl-line .seg{flex:1;height:2px;background:var(--line)}
+  .tl-line .seg.a{background:var(--lime)}
+  .strip{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .strip .c{flex:1;padding:7px 9px;border-right:1px solid var(--line-soft)}
+  .strip .c:last-child{border-right:0}
+  .strip .k{font-size:8px;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase}
+  .strip .v{font-family:var(--disp);font-weight:700;font-size:13px;margin-top:3px}
+  .strip .v.sm{font-size:11px}
+  .felt{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:11px;
+    display:flex;flex-direction:column;gap:9px}
+  .felt .top{display:flex;gap:10px;align-items:center}
+  .felt .axes{flex:1;display:flex;flex-direction:column;gap:6px}
+  .axrow{display:flex;align-items:center;gap:7px}
+  .axrow .al{font-size:8px;letter-spacing:.06em;color:var(--ink-3);width:30px;text-transform:uppercase}
+  .axrow .track{flex:1;height:4px;background:var(--inset);border-radius:3px;position:relative}
+  .axrow .track i{position:absolute;top:-3px;width:3px;height:10px;border-radius:2px;background:var(--lime)}
+  .axrow .av{font-size:10px;font-weight:700;color:var(--lime);width:22px;text-align:right}
+  .try{display:flex;align-items:center;gap:8px;background:var(--inset);border:1px solid var(--line-soft);
+    border-radius:9px;padding:8px 10px}
+  .try .tg{font-size:8px;font-weight:700;color:var(--ink-3);letter-spacing:.1em}
+  .try .big{font-family:var(--disp);font-weight:700;font-size:13px;flex:1}
+  .try .big em{font-style:normal;color:var(--lime)}
+  .try .chip{font-size:8px;font-weight:700;color:#31420a;background:var(--lime-bright);border-radius:5px;padding:2px 6px}
+  .note{font-size:10px;color:var(--ink-2);line-height:1.5}
+
+  /* config */
+  .tracks-h{display:flex;align-items:center;justify-content:space-between}
+  .tracks-h .h{font-family:var(--disp);font-weight:700;font-size:15px}
+  .tracks-h .add{font-size:10px;font-weight:700;color:var(--lime);border:1px solid var(--lime-dim);
+    background:rgba(189,238,54,.14);border-radius:6px;padding:4px 8px}
+  .tcard{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px 11px}
+  .tcard .r1{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
+  .tcard .nm{font-family:var(--disp);font-weight:700;font-size:13px}
+  .tcard .ed{font-size:9px;color:var(--ink-3)}
+  .tcard .lap{font-size:9px;color:var(--ink-2)}
+  .tcard .lap b{color:var(--lime);font-weight:700}
+  .tcard .feel{font-size:9px;color:var(--ink-3);margin-top:6px;display:flex;gap:6px}
+  .tcard .feel span{background:var(--inset);border:1px solid var(--line-soft);border-radius:12px;padding:2px 7px}
+
+  /* AI sheet (frame from ai_chat.html) */
+  .behind{position:absolute;inset:0;padding:13px;filter:saturate(.5)}
+  .behind::after{content:"";position:absolute;inset:0;background:rgba(20,25,22,.34)}
+  .behind .card{background:#fff;border:1px solid var(--line);border-radius:11px;height:60px;margin-bottom:9px}
+  .sheet{position:absolute;left:0;right:0;bottom:0;top:70px;border-radius:24px 24px 0 0;
+    background:linear-gradient(180deg,#ffffff,#f6f8f2);
+    box-shadow:0 -18px 50px -10px rgba(79,208,230,.3),0 -2px 0 0 rgba(189,238,54,.5);
+    display:flex;flex-direction:column;overflow:hidden}
+  .sheet::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--ai)}
+  .grab{width:36px;height:4px;border-radius:3px;background:#cdd3c6;margin:9px auto 3px}
+  .ahead{display:flex;align-items:center;gap:9px;padding:5px 15px 11px;border-bottom:1px solid var(--line-soft)}
+  .orb{width:28px;height:28px;border-radius:50%;background:var(--ai);flex:none;position:relative;
+    box-shadow:0 0 0 4px rgba(127,224,192,.22),0 4px 12px rgba(79,208,230,.4)}
+  .orb::after{content:"";position:absolute;inset:6px 7px auto auto;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.85)}
+  .ahead .nm{font-family:var(--disp);font-weight:700;font-size:14px}
+  .ahead .ctx{font-size:8px;color:var(--ink-3);margin-top:1px}
+  .ahead .x{margin-left:auto;color:var(--ink-3);font-size:14px}
+  .thread{flex:1;padding:13px 13px 6px;display:flex;flex-direction:column;gap:11px;overflow:hidden}
+  .row{display:flex;gap:8px;align-items:flex-end}
+  .row.me{justify-content:flex-end}
+  .av2{width:20px;height:20px;border-radius:50%;background:var(--ai);flex:none;margin-bottom:2px}
+  .bub{max-width:80%;padding:9px 11px;border-radius:13px;font-size:11px;line-height:1.5}
+  .ai .bub{background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:5px}
+  .me .bub{background:rgba(189,238,54,.2);border:1px solid var(--lime-dim);border-bottom-right-radius:5px}
+  .rec{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px;margin-left:28px;
+    box-shadow:0 8px 20px -14px rgba(79,208,230,.5)}
+  .rec .h{display:flex;align-items:center;gap:7px;margin-bottom:8px}
+  .rec .h .g{width:3px;height:12px;border-radius:2px;background:var(--ai)}
+  .rec .h .t{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+  .rec .h .conf{margin-left:auto;font-size:8px;font-weight:700;color:var(--amber);
+    border:1px solid #e0c089;background:rgba(191,125,20,.12);border-radius:5px;padding:2px 6px}
+  .rec .big{font-family:var(--disp);font-weight:700;font-size:18px;margin-bottom:6px}
+  .rec .big em{font-style:normal;color:var(--lime)}
+  .rec .why{font-size:10px;color:var(--ink-2);line-height:1.5;margin-bottom:8px}
+  .rec .chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+  .rec .chip{font-size:8px;color:var(--ink-2);background:var(--inset);border:1px solid var(--line-soft);border-radius:20px;padding:3px 7px}
+  .rec .apply{text-align:center;font-size:11px;font-weight:700;color:#0f1314;background:var(--lime-bright);
+    border-radius:8px;padding:9px;letter-spacing:.04em}
+  .adock{border-top:1px solid var(--line-soft);background:var(--paper);padding:9px 12px 11px}
+  .qchips{display:flex;gap:6px;overflow:hidden;margin-bottom:8px}
+  .q{font-size:9px;white-space:nowrap;color:var(--lime);border:1px solid var(--lime-dim);
+    background:rgba(189,238,54,.14);border-radius:20px;padding:5px 9px}
+  .field{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);
+    border-radius:20px;padding:6px 6px 6px 13px}
+  .field .ph{flex:1;font-size:11px;color:var(--ink-3)}
+  .field .send{width:32px;height:32px;border-radius:50%;background:var(--ai);display:grid;place-items:center;
+    color:#0f1314;font-size:14px}
+</style>
+</head>
+<body>
+  <div class="title">SUS<b>LOG</b> · screens</div>
+  <div class="sub">Stylized mockups · Telemetry-light</div>
+
+  <div class="rack">
+
+    <!-- ========== 1 · SETUP ========== -->
+    <div class="col">
+      <div class="device"><div class="screen">
+        <div class="status"><span>14:32</span><span class="dots">•••</span></div>
+        <div class="body">
+          <div class="selrow">
+            <div class="sel">E46 M3 <span class="cv">▾</span></div>
+            <div class="sel">NJMP TB · Dry <span class="cv">▾</span></div>
+          </div>
+          <div class="banner">
+            <div class="d">Recommended: <b>Front Rebound → 18</b></div>
+            <div class="go">Apply</div>
+          </div>
+          <div class="toggle">
+            <div class="tl"><div class="tt">Axle L/R Lock</div><div class="ts">Left and right move together</div></div>
+            <div class="sw"></div>
+          </div>
+          <div class="grid2">
+            <div class="corner">
+              <div class="cl">LEFT <b>FRONT</b></div>
+              <div class="step"><span class="lbl">Rebound</span><span class="ct"><span class="b">−</span><span class="v">16</span><span class="b">+</span></span></div>
+              <div class="step"><span class="lbl">Compression</span><span class="ct"><span class="b">−</span><span class="v">16</span><span class="b">+</span></span></div>
+            </div>
+            <div class="corner">
+              <div class="cl">RIGHT <b>FRONT</b></div>
+              <div class="step"><span class="lbl">Rebound</span><span class="ct"><span class="b">−</span><span class="v">16</span><span class="b">+</span></span></div>
+              <div class="step"><span class="lbl">Compression</span><span class="ct"><span class="b">−</span><span class="v">16</span><span class="b">+</span></span></div>
+            </div>
+            <div class="corner">
+              <div class="cl">LEFT <b>REAR</b></div>
+              <div class="step"><span class="lbl">Rebound</span><span class="ct"><span class="b">−</span><span class="v">15</span><span class="b">+</span></span></div>
+              <div class="step"><span class="lbl">Compression</span><span class="ct"><span class="b">−</span><span class="v">15</span><span class="b">+</span></span></div>
+            </div>
+            <div class="corner">
+              <div class="cl">RIGHT <b>REAR</b></div>
+              <div class="step"><span class="lbl">Rebound</span><span class="ct"><span class="b">−</span><span class="v">15</span><span class="b">+</span></span></div>
+              <div class="step"><span class="lbl">Compression</span><span class="ct"><span class="b">−</span><span class="v">15</span><span class="b">+</span></span></div>
+            </div>
+          </div>
+          <div class="save">SAVE SETUP</div>
+        </div>
+        <div class="nav">
+          <div class="n on"><span class="ic"></span>Setup</div>
+          <div class="n"><span class="ic"></span>Config</div>
+          <div class="fab">+</div>
+          <div class="n"><span class="ic"></span>Tuning</div>
+          <div class="n"><span class="ic"></span>Settings</div>
+        </div>
+      </div></div>
+      <div class="cap"><b>Setup</b> · tweak every corner</div>
+    </div>
+
+    <!-- ========== 2 · TUNING ========== -->
+    <div class="col">
+      <div class="device"><div class="screen">
+        <div class="status"><span>14:32</span><span class="dots">•••</span></div>
+        <div class="body">
+          <div class="sh"><span class="bar"></span><span class="t">Tuning History</span><span class="meta">5 runs</span></div>
+          <div class="tl-line">
+            <span class="n"></span><span class="seg a"></span>
+            <span class="n on"></span><span class="seg a"></span>
+            <span class="n on"></span><span class="seg"></span>
+            <span class="n"></span><span class="seg"></span>
+            <span class="n"></span>
+          </div>
+          <div class="strip">
+            <div class="c"><div class="k">Run</div><div class="v">04</div></div>
+            <div class="c"><div class="k">Best lap</div><div class="v sm">1:33.36</div></div>
+            <div class="c"><div class="k">Changed</div><div class="v sm">Front Reb −1</div></div>
+          </div>
+          <div class="sh"><span class="bar"></span><span class="t">Run 4 · How it felt</span></div>
+          <div class="felt">
+            <div class="top">
+              <svg width="120" height="120" viewBox="0 0 150 150">
+                <polygon points="75,23 124,59 106,117 44,117 26,59" fill="none" stroke="#d2d7cb" stroke-width="1.4"/>
+                <polygon points="75,49 100,67 91,96 60,96 51,67" fill="none" stroke="#e0e4d9" stroke-width="1.2"/>
+                <line x1="75" y1="75" x2="75" y2="23" stroke="#e0e4d9"/><line x1="75" y1="75" x2="124" y2="59" stroke="#e0e4d9"/>
+                <line x1="75" y1="75" x2="106" y2="117" stroke="#e0e4d9"/><line x1="75" y1="75" x2="44" y2="117" stroke="#e0e4d9"/>
+                <line x1="75" y1="75" x2="26" y2="59" stroke="#e0e4d9"/>
+                <polygon points="75,32 109,64 93,99 47,113 39,63" fill="rgba(189,238,54,.28)" stroke="#5c7d12" stroke-width="2"/>
+                <circle cx="75" cy="32" r="3" fill="#5c7d12"/><circle cx="109" cy="64" r="3" fill="#5c7d12"/>
+                <circle cx="93" cy="99" r="3" fill="#5c7d12"/><circle cx="47" cy="113" r="3" fill="#5c7d12"/><circle cx="39" cy="63" r="3" fill="#5c7d12"/>
+                <text x="75" y="14" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8a9590">FEELS</text>
+                <text x="75" y="145" text-anchor="middle" font-family="Chakra Petch" font-weight="700" font-size="11" fill="#5c7d12">BEST</text>
+              </svg>
+              <div class="axes">
+                <div class="axrow"><span class="al">Entry</span><span class="track"><i style="left:78%"></i></span><span class="av">ok</span></div>
+                <div class="axrow"><span class="al">Mid</span><span class="track"><i style="left:64%"></i></span><span class="av">+1</span></div>
+                <div class="axrow"><span class="al">Exit</span><span class="track"><i style="left:52%"></i></span><span class="av">0</span></div>
+                <div class="axrow"><span class="al">Grip</span><span class="track"><i style="left:88%"></i></span><span class="av">5</span></div>
+                <div class="axrow"><span class="al">Body</span><span class="track"><i style="left:70%"></i></span><span class="av">0</span></div>
+              </div>
+            </div>
+            <div class="try">
+              <span class="tg">TRY</span>
+              <span class="big">Front Rebound <em>8 → 10</em></span>
+              <span class="chip">lap best</span>
+            </div>
+            <div class="note">Best feel so far. Keep everything else the same. Try one more click.</div>
+          </div>
+        </div>
+        <div class="nav">
+          <div class="n"><span class="ic"></span>Setup</div>
+          <div class="n"><span class="ic"></span>Config</div>
+          <div class="fab">+</div>
+          <div class="n on"><span class="ic"></span>Tuning</div>
+          <div class="n"><span class="ic"></span>Settings</div>
+        </div>
+      </div></div>
+      <div class="cap"><b>Tuning</b> · find the best feel</div>
+    </div>
+
+    <!-- ========== 3 · AI ========== -->
+    <div class="col">
+      <div class="device"><div class="screen">
+        <div class="behind">
+          <div class="sh"><span class="bar"></span><span class="t">Tuning · NJMP TB · Dry</span></div>
+          <div class="card"></div><div class="card"></div><div class="card"></div>
+        </div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="ahead">
+            <div class="orb"></div>
+            <div><div class="nm">Tuning Assistant</div><div class="ctx">NJMP TB · 5 runs · local model + 3 guides loaded</div></div>
+            <div class="x">✕</div>
+          </div>
+          <div class="thread">
+            <div class="row me"><div class="bub">Entry understeer, then the rear feels loose on throttle out of the slow stuff.</div></div>
+            <div class="row ai"><div class="av2"></div><div class="bub">Front won't rotate, rear lets go on power. Your clean runs point the same way. Here is the test.</div></div>
+            <div class="rec">
+              <div class="h"><span class="g"></span><span class="t">Next test</span><span class="conf">Med confidence</span></div>
+              <div class="big">Front Rebound <em>8 → 10</em></div>
+              <div class="why">Slower front rebound holds the nose down longer on entry. Keep the rear as is so you can read the change.</div>
+              <div class="chips"><span class="chip">Run 4 felt best</span><span class="chip">local model agrees</span><span class="chip">2-way guide p.3</span></div>
+              <div class="apply">Apply to setup</div>
+            </div>
+          </div>
+          <div class="adock">
+            <div class="qchips"><span class="q">Entry understeer</span><span class="q">Exit oversteer</span><span class="q">Too nervous</span></div>
+            <div class="field"><span class="ph">Describe what the car is doing…</span><div class="send">↑</div></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="cap"><b>AI</b> · chat, then one-tap apply</div>
+    </div>
+
+    <!-- ========== 4 · CONFIG ========== -->
+    <div class="col">
+      <div class="device"><div class="screen">
+        <div class="status"><span>14:32</span><span class="dots">•••</span></div>
+        <div class="body">
+          <div class="selrow"><div class="sel">E46 M3 <span class="cv">▾</span></div></div>
+          <div class="tracks-h"><span class="h">Your Tracks</span><span class="add">+ Create</span></div>
+          <div class="tcard">
+            <div class="r1"><span class="nm">NJMP TB · Dry · CRS</span><span class="ed">Edit</span></div>
+            <div class="lap">Best lap <b>1:33.36</b> · 5 runs</div>
+            <div class="feel"><span>Entry Neutral</span><span>Sl. Oversteer</span></div>
+          </div>
+          <div class="tcard">
+            <div class="r1"><span class="nm">WGI · Dry · CRS</span><span class="ed">Edit</span></div>
+            <div class="lap">Best lap <b>1:41.02</b> · 8 runs</div>
+            <div class="feel"><span>Sl. Understeer</span><span>Neutral</span></div>
+          </div>
+          <div class="tcard">
+            <div class="r1"><span class="nm">Street</span><span class="ed">Edit</span></div>
+            <div class="lap">No lap time · 2 runs</div>
+            <div class="feel"><span>Comfort</span><span>Soft rear</span></div>
+          </div>
+        </div>
+        <div class="nav">
+          <div class="n"><span class="ic"></span>Setup</div>
+          <div class="n on"><span class="ic"></span>Config</div>
+          <div class="fab">+</div>
+          <div class="n"><span class="ic"></span>Tuning</div>
+          <div class="n"><span class="ic"></span>Settings</div>
+        </div>
+      </div></div>
+      <div class="cap"><b>Config</b> · a setup per track</div>
+    </div>
+
+  </div>
+</body>
+</html>
